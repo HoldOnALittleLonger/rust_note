@@ -1,0 +1,235 @@
+Cargo :
+^^^^^
+cargo is rust's build system and package manager.
+it handles code dependencies.
+
+create new project with cargo :
+    cargo new <project-name>
+this will create a new directory named <project-name>.
+in which directory,a file name "Cargo.toml" is created,the file describes the
+project information,such package version,dependencies,etc.
+and a subdirectory named "src" is creaded,that is the place where source code files
+in. // for hello world project,it automatically create main.rs file,and contains
+    // full code used to print "hello,world".
+
+we can specify the version control system through command line parameter "--vcs=".
+if we have specified vcs,it will automatically initializes the vcs.
+// for git,execute "git init".
+
+command "init" of cargo
+    help us to initialize cargo for a been exist project that without cargo has
+    associated.
+command "build" of cargo
+    ask cargo build the project,this will produces a lot of files needed by the
+    project,moreover,it will produces an binary executable file of debug version
+    of this project.the built files are placed under the subdirectory "target".
+    // in default,cargo will build debug version of executable.with the parameter
+    // "--release",it will build release version of executable,that means no
+    // debug information is contained.
+command "run" of cargo
+    ask cargo build and run the binary executable file of this project.
+command "check" of cargo
+    quickly checks code to make sure it compiles but does not produce an executable.
+
+Variables and Mutability :
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+keyword "let" is used to declare a variable.by default,all variable is immutable,but
+we can change it to mutable by use keyword "mut".
+    let x = 5;      // immutable,default
+    let mut x = 5;  // mutable
+if a variable is immutable,then we can not modify its value later,we can only specify
+the value for it at initialization time.if we did this,"rustc" will refuse to
+compiles it and throws error mesage.
+// in C and C++,variable is mutable by default,keyword "const" is used to declare
+// a constant.we can also cast away the const,but actually compiler just create
+// a new temporary object same as the old object without "const" specifier.
+
+keyword "const" is used to declare a constant.a constant is not immutable by default,
+it is always immutable.
+    const CONSTANT_VALUE: u32 = 10 + 20;
+    |     |               |     |
+    |     |               |     +--> constant initialization expression
+    |     |               +--> data type
+    |     +--> object name
+    +--> const keyword
+constant may be set only to a constant expression,that means its value must be
+determined during compile time,not at the runtime.
+the lifetime of constant is valid for the entire time a program runs,within the 
+scope in which it were declared.
+! constant expression means,can not includes any variables.
+
+rust allows "shadowing",that is permit redefine the variable several times,the last
+definition will mask the previous definitions,and they are called shadowed by the
+next definition.
+    let x = 5;          // shadowed by the second definition
+    let x = x + 1;      // shadowed by the third definition
+    let x = x + 1 + 1;  // the last,overshadows previous definitions
+note that,shadowing has scope limitation,that means if the overshadow definition
+is defined in a compound statement.its shadowing is only valid in that scope.
+    let x = 2;      // @x == 2
+    let x = x + 1;  // now @x == 3
+    {
+        // inner scope
+        let x = 5;  // now @x == 5
+    }
+    // now @x == 3
+! shadowing is finished during compile time.
+  by use shadowing,we can modify the initial value of an immutable variable
+  during compile time.
+  and because the data type is automatically deduced from initializer,so we
+  can let the variable to represent different data with different type as well.
+        let x = 2;                           // integer
+        let x = String::from("hello world"); // string
+  ! we can not do the same at mutable variable,because its data type is determined
+    at the first time when it is bound to a value.
+  ! we can overshadow the old definition that is mutable with an immutable definition,
+    conversely also is OK.
+        let mut x = 10; // mutable @x.
+        let x = 20;     // overshadow "mut x",now is immutable @x.
+
+Data Types :
+^^^^^^^^^^
+
+every value in rust is of a certain data type,rust use the type to determines what
+the object it is and what operations can be done on them.
+! rust is a statically typed language,all types of all variables must be known
+  at compile time.
+some types may support type-conversions.
+
+scalar types >
+    a scalar type represents a single value.
+    rust has four primary scalar types: integer,floating-point,boolean,character.
+
+integer types >
+    i8, u8          =>   8-bit
+    i16, u16        =>   16-bit
+    i32, u32        =>   32-bit
+    i64, u64        =>   64-bit
+    i128, u128      =>   128-bit
+    isize, usize    =>   architecture-dependent
+
+    i: signed integer
+    u: unsigned integer
+
+    default integer type is i32.
+    '-' means minus value,'+' can be omitted.
+
+    integer literals:
+        10  10_22       decimal
+        0xff            hex
+        0o52            octal
+        0b1111_0000     binary
+        b'C'            byte(u8 only)
+
+        symbol '_' as visual separator for better readability.
+        0x, 0o, 0b, b as prefix.
+
+    representation: 2's complement
+    overflow: wrap around
+
+    ! for release version,rust compiler do not processes integer overflow checking.
+      for debug version,compiler will throws error and panic.
+      some useful standard library features:
+        wrapping_* methods => wrap in all modes // release or debug
+        checked_* methods => return the None value if overflow
+        overflowing_* methods => return the value and a boolean indicating
+                                 whether there was overflow
+        saturating_* methods => saturate at the value's minimum or maximum values
+
+floating-point types >
+    f32     =>      32-bit floating-point (single precision)
+    f64     =>      64-bit floating-point (double precision)
+
+    default floating-point type is f64.
+
+numeric operations >
+    +   =>  addition
+    -   =>  substraction
+    *   =>  multiplication
+    /   =>  division        // floor to the result
+    %   =>  remainder
+
+    ()  =>  parenthesis for adjust priority
+
+    !! NUMBERIC OPERATIONS FOR DIFFERENT TYPES CAN NOT BE MIXED.
+       FOR EXAMPLE,WE CAN NOT ADD AN INTEGER OBJECT TO A FLOATINTG-POINT OBJECT.
+
+boolean types >
+    bool    => 1 byte
+        true    =>  T
+        false   =>  F
+
+character type >
+    char    =>  4 bytes,represents a Unicode scalar value,can represents a lot
+                more than just ASCII.
+
+    single quotation '' means the value is a character.
+    // for string,that is "".
+
+compound types >
+    compound types can group multiple values into one type,and rust has two
+    primitive compound types: tuples and arrays.
+
+tuple type >
+    similar to std::tuple<> in C++,rust also can let an object to contains several
+    values have different types.
+    use the parenthesis symbol to represent tuple type:
+        let tup: (i32. f32, char) = (20, 3.2, 'x');
+    this statement declares an immutable variable named @tup,its type is the
+    compound type composed by types i32,f32,char,and initialize it to
+    (20, 3.2, 'x').
+    a tuple is considered a single compound element.
+    to get individual values in the compound type:
+        let [x, y, z] = tup;
+    // in C++,we can use
+    //     auto [x, y, z] = struct_object;
+    // to do the same.
+    // but for std::tuple<>,for get the individual value,
+    // we must use
+    //     std::get<N>(std::tuple<> object);
+
+    we can also access a tuple element directly by using a period(.) followed by
+    the index of the value we want to access:
+      let x = tup.0;    // the first value has index 0
+      let y = tup.1;
+      let z = tup.2;
+      // similar to the member accessor in C/C++.
+
+array type >
+    an array is a collection of values have the same type.
+    for declare an array,we can do:
+        let a = [1, 2, 3, 4, 5];
+    this will declare variable @a is type of an array of i32 type,and the array
+    size is 5.
+    the first element in an array has index 0.
+    except integer array,we can also define string array:
+        let strings = ["one", "two", "three"];
+    others as the same.
+
+    if we want to explicitly specify the underlying type of array's elements,
+    we can do:
+        let a: [f32; 5] = [1.0, 1.2, 1.4, 1.6, 2.0];
+            |  | | | |     |
+            |  | | | |     +--> initializer-list
+            |  | | | +--> size of array
+            |  | | +--> delimiter
+            |  | +--> floating-point 32-bit
+            |  +--> compound type,array
+            +--> object name
+
+    we can also omit the underlying type,instead,we initialize the array with all
+    elements have the same value:
+        let a = [2; 10];
+    this will declare an array has 10 elements,and each of them is initialized to
+    value 2,thus the underlying type is i32.
+    ! other type is OK.
+
+    for access an element in array,we can use the syntax:
+        @a[@index]
+    to access it.
+    
+    ! if we access to an array with a invalid index at runtime,the thread which
+      did that will throw error and panicked.
+      if we specify the index to an array with a constant,then this error will be
+      detected by compiler during compile time.
