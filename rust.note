@@ -233,3 +233,512 @@ array type >
       did that will throw error and panicked.
       if we specify the index to an array with a constant,then this error will be
       detected by compiler during compile time.
+
+Functions :
+^^^^^^^^^
+
+keyword "fn" is used to declare a function.
+    fn the_func() {
+        ...
+    }
+
+of course,functions can receive some parameters,and these parameters is placed in
+parenthesis of the function,as parameter list.
+    fn the_func(x: i32) {
+        ...
+    }
+
+where @x is the name of parameter,i32 is the type of @x,this is same as variable
+declare in function's body.
+if there is several parameters,we need to use comma ',' symbol to separate them.
+    fn the_func(x: i32, y: f32) {
+        ...
+    }
+note that,the parameters of a function can only be seen in the function's body,
+that is the scope of that function.called local variable.
+
+function can be called through the function's name and some parameters(if have).
+    the_func(2, 3.2);
+
+function body is made up of a series of statements optionally ending in an
+expression.
+rust is an expression-based language,in which
+    statements are instructions that perform some action and do not return a value
+    expressions evaluate to a resultant value
+expressions do not invlude ending semicolons,but statements have one.
+function definitions are also statements.
+calling a function is an expression.
+calling a macro is an expression.
+a new scope block created with curly brackets is an expression.
+    let x = {
+        let y = 3;
+        y + 1   // an expression,because no ending semicolon.
+    }; // @x will be set to 4.
+
+because calling to a function is an expression,thus function can return values
+as its result.
+    fn add(x: i32, y: i32) -> i32 {
+        x + y   // expression
+    } // similar to trailing return in C++.
+
+keyword "return" is used to return from current function,it can be followed by
+an expression,as the result of this function evaluate.
+    fn the_func() -> i32 {
+        return 32;
+    }
+    // because function calling is expression,we can use the calling in variable
+    // initialization,or other somewhere.
+
+
+Comments :
+^^^^^^^^
+
+line comment which turns the context in an line to comment.
+    // ...
+
+block comment which turns the context in a block to comment.
+    /* ... */
+
+Control Flow :
+^^^^^^^^^^^^
+
+if expressions >
+    if @predicate {
+        // branch A
+    } else {
+        // branch B
+    }
+
+    if @predicate {
+        // branch A
+    } else if @predicate {
+        // branch B
+    } else {
+        // branch C
+    }
+
+    if @predicate {
+        // branch A
+    }
+
+    (@condition)
+    @predicate is a boolean value,or a logic expression,
+    which will produce a boolean value.
+        X > Y
+        X < Y
+        X == Y
+        X != Y
+        true
+        false
+
+    if expression will only executes one branch, where @predicate is the
+    first predicate is true.
+
+    we can combine "let" and "if expression.
+        let x = if @predicate { @expression1 } else { @expression2 };
+
+    ! different from C and C++,the @predicate(or,@condition) is not inclued in
+      parenthesis.and each branch must be included in the block.
+
+loops >
+    keyword "loop" used to processes infinity loop,no stop condition at there.
+        loop {
+            println!("again.");
+        }
+    but keyword "break" can be used break current loop.(only current loop-level)
+        let mut x = 0;
+        loop {
+            if x > 3 {
+                break;
+            }
+        }
+    we also can let an expression follows "break",the expression will be evaluated
+    when the loop is going to be broken,and the result of the expression is the
+    result of this loop expression.
+        let mut x = 0;
+        loop {
+            if x > 3 {
+                break x + 5;
+            }
+
+            x += 1;
+        }
+
+    keyword "continue" can be used in loop expression,when the "continue" statement
+    is executed,the rest of current loop would not be executed.instead,the control
+    flow will skip the rest and get into next iteration.
+        let mut x = 3;
+        loop {
+            continue;
+            x += 1;     // this statement will never be executed.
+        }
+
+    we can set a label for a loop,and the label can be used later in the nested
+    loop expression,by the "break" keyword or the "continue" keyword.
+        'loop_label: loop {
+
+        } // this will set "'loop_label" as the label of this loop,in other word,
+          // name it.
+
+        'loop_1: loop {
+            'loop_2: loop {
+                break 'loop_1;
+
+                'loop_3: loop {
+                    break 'loop_2;
+                }
+            }
+        }
+    ! loop label must started with a quote symbol "'".
+    ! current loop can only see the loop label of front-level loop.
+          'loop_1: loop {
+                  continue 'loop_2; // ERROR
+              'loop_2: loop {
+                  ...
+              }
+          }
+    ! in C style >
+          loop_1:
+                  loop {
+          loop_2:
+                          loop {
+                                  goto loop_1;
+                          }       // continue 'loop_1;
+                  }
+      but in rust,only "jmp <symbol>b" is allowed in nested cycle.
+
+    keyword "while" can be used to execute a loop,but different from keyword "loop",
+    if has a stop condition.
+        let mut x = 0;
+        while x != 100 {
+            ...
+        }
+    the while loop expression will only be evaluated if the @predicate is true,
+    if the @predicate is false,the expression would not be evaluated.
+    we can use true as the @predicate,to let while-loop behaves same as loop.
+    
+    keyword "for" can be used to looping through a collection,it can iterates each
+    element in a given range,and will stops when all elements have been iterated.
+        let x = [5; 10];    // an array
+        for e in x {
+            println("element is {e}.");
+        }
+    where @e is a local variable,it used by "for" to bind elements from a given
+    range,and its lifetime will ends when "for" is stopped.
+    ! standard libarary provides 'Range' infrastructure,it can be used to 
+      generate a collection of numbers from a given range,and it can be used
+      combined with for-loop.
+          for v in (1..100).rev() {
+              println!("v is {v}.");
+          } // for each number in range [1, 100),in reverse order.
+                                       #^half-open
+      ! if we want reverse order,must use .rev().
+        such the range (100..1) is an error,and the range 100..1 will no number collection
+        is produced.(the for-loop will just be skipped)
+
+
+    if we use for with an array,it can iterates each element in that array.
+    but if we use it with a range of numbers,the range will be half-open by default.
+        for v in 1..50 {
+
+        } // half-open,range [1, 50)
+    if we need inclusive range,must use '=' symbole before the end point.
+        for v in 1..=50 {
+
+        } // inclusive range,range [1, 50]
+
+Understanding Ownership :
+^^^^^^^^^^^^^^^^^^^^^^^
+
+the base feature of rust for memory safety.
+
+ownership is a set of rules that govern how a rust program manages memory.
+in rust,memory is managed through a system of ownership with a set of rules that
+the compiler checks.must all rule checks are passed,the program would be compiled.
+
+ownership rules >
+    each value in rust has an owner.
+    there can only be one owner at a time.
+    when the owner goest out of scope,the value will be dropped.
+
+variable scope >
+    a scope is the range within a program for which an item is valid.
+    local variable is valid in its declaration scope.
+
+The String type >
+    String type manages data allocated on the heap,and as such is able to store
+    an amount of text that is unknown to us at compile time.
+        let s = String::from("nil"); // declare an immutable variable @s.
+                                     // initialize @s to String type with
+                                     // text "nil".
+        let mut s2 = String::from("Hello"); // mutable variable
+        s2.push_str(",World");  // @s2 => "Hello,World"
+
+for a string literal,the text is hardcoded,we know the contents at compile time.
+hence,we can not modify string literal during runtime,and the size of this blob
+object must be known at compile time.
+
+String support a mutable,growable piece of text,the size of contents is unknown
+at compile time.
+so
+    the memory must be requested from the memory allocator at runtime.
+    we need a way of returning this memory to the allocator when we are
+    done with the String object.
+
+for the language with GC,GC will handles memory free.
+for the language without GC,programmer must free it explicitly.
+rust has not GC,but in rust,the memory is automatically returned once the variable
+that owns it goes out of scope. /* C++ automatically destructor,RAII */
+when a variable goes out to its scope,rust calls a special function,which is
+called drop().in that function,author of local variable(on heap) can put the
+code to return the memory.
+// rust calls drop() automatically at the closing curly bracket.
+
+for variable bound to a value is known,fixed size,assign such variable to another
+variable,rust will simply copy it and pushed onto the stack.
+    let x = 5;  // bind 5 to @x,on stack
+    let y = x;  // makeup @y,copy @x to @y,on stack
+                // the value is known at compile time.
+    ! stack-only data,copy it,and this copying is happened at compile time.
+      only shallowing copy,but that is the all thing.
+
+but for variable bound to a heap memory,assign such variable to another variable,
+rust considers the previous variable as no longer valid,and the second variable
+will becomes the owner of that heap memory.when these two variables go out of
+scope,only the second variable will be dropped.
+! object's meta information is stored on stack,in which a pointer
+  points to the heap memory where stored the data.
+  for example.the String type,it may be looks like
+      name          object-name
+      ptr           0x????????? -------> [ 0x???01 | 0x???02 | 0x???03 | ... ]
+      len           ? -----------------> |<---------- in-use --------->|
+      capability    ? -----------------> |<-------------- all -------------->|
+      |<------- meta -------->|          |<--------- heap memory ----------->|
+       # on stack
+! in C++,such assignment is called move semantics.
+  if an object is moved,that called the second object "steal" the inner of
+  the first object.and the first object must not be used anymore,because it
+  in indeterminacy state.
+  generally,we reset the inner pointer to NULL,hence even the destructor of
+  the first object is called,"delete" a NULL pointer is legal.
+  the memory points by that pointer before now is pointed by the pointer in
+  second object.when the destructor of the second object is called,the memory
+  will be deallocated.
+
+in rust,for heap object,move semantics always applied when execute assignment.
+if we used the object that is moved,compiler will throw error.
+! this will prevent shallow copy happens on heap object.
+
+drop() also will be called if we assign to an object which been holds a heap object.
+    let mut s = String::from("old");
+    s = String::from("new"); // drop() will be called to drop the String object
+                             // which has literal "old".
+                             // at there,a new String object is produced and
+                             // bound to @s,the older will be dropped.
+! this is behaves std::unique_ptr<> in C++,when we assign the smart pointer a
+  new pointer,the older will be released.
+
+deeply copy is available in rust for heap object,the common method clone() can 
+handle this.
+    let s1 = String::from("hello");
+    let s2 = s1.clone(); // new String object is cloned from @s1,and bound to @s2
+
+rust has special annotation called "Copy" trait,we can place on the types are 
+stored on the stack.when assignment execute,rust will copy the object rather than
+move it.(trivally copied)
+if the type or any of its parts,has implemented the "Drop" trait,then we can not
+place "Copy" trait on it.
+!! some built-in simple types are Copy trait applied,such integer,char,boolean,
+   and floating-point.
+   for tuple,it is Copy trait applied if and only if all its types are Copy trait
+   applied.
+
+Ownership and Functions >
+    passing variable to a function will move or copy.
+    for Copy trait type,the passing will do object copy.
+    for no Copy trait type,the passing will do object move.
+        fn the_func(x: i32) {
+        }
+
+        let x = 3;
+        the_func(x); // copy
+
+        fn take_ownership(s: String) {
+        } // parameter @s will be dropped when it goes out of function scope.
+
+        let s = String::from("move");
+        take_ownership(s); // move,and local @s is no longer valid.
+
+Return Values and Scope >
+    returning values can also transfer ownership.
+        fn transfer_ownership() -> String {
+            let s = String::from("move");
+            s
+        }
+
+        let s = transfer_ownership();
+
+                                      // takes ownership
+        fn transfer_ownership_giveback(cur_owner: String) -> String {
+            cur_owner // return ownership
+        }
+
+        let s = String::from("owner");
+        let s1 = transfer_ownership_giveback(s); // @s is moved
+        // @s1 takes ownership from the function,that is
+           the @s's String object.
+
+References and Borrowing >
+    symbol '&' prefixes on an object can makeup a reference to that object.
+    when we has a function receives a parameter is associated with heap object,
+    pass argument to it will cause move semantics.for let the argument still
+    valid after function calling finished,we need to return the ownership from
+    the function.if we want to return another value of different type,then we
+    can not return the ownership.
+    for deal with this,we can pass a reference to the argument to that function.
+    after the function calling is finished,the argument still valid.
+        fn calculate_length(str: &String) -> usize {
+            str.len()       //   ^type is String reference.
+        }                   // then we can use the object without need to take
+                            // ownership.
+
+        let s = String::from("Hello");
+        let len: usize = calculate_length(&s);
+        // @s still valid,and no heap object is dropped.
+    ! reference has no ownership.
+
+    in rust,the action of creating a reference is called "borrowing".
+    because we borrowed it,so we has no ownership,thus we can not modify it.
+    but there is a way to let us modify the borrowed thing.
+    we can makeup a multable reference,this require the original object also is
+    mutable.
+        fn add_one(a: &mut i32) -> i32 {
+            *a += 1; // ^mutable references
+            *a
+        } // behaves like to prefix-increment
+
+        let mut x = 5;
+        let y = add_one(&mut x); // create mutable reference,and pass it.
+    ! no keyword "mut",will create immutable reference by default,even the original
+      is mutable.
+    ! '*' is dereference operator,it can be used for reference,to get the orignal
+      value of the target the reference refers to.
+          let mut x = 0;
+          let ref_x = &x; // makeup a reference,@ref_x is type of reference
+          let y = *ref_x; // dereference
+
+      ! different from C++ reference,in rust,reference is more similar
+        to a C++ pointer rather than the C++ reference.
+
+    if we have a mutable reference to the original target,then we can not create
+    any other reference to that target,whatever it is immutable reference or
+    mutable reference. // conversely is the same.
+        let mut x = 0;
+        let m_ref = &mut x; // OK
+        let imm_ref = &x;   // ERROR,because there been a mutable reference to @x
+        let m_ref1 = &mut x; // ERROR,same reason
+
+        let y = 0;
+        let imm_ref_y = &y; // OK
+        let imm_ref1_y = &y; // OK
+    ! we can not borrow the object as mutable more than once at a time.
+      we can only create a new mutable reference until the last one is
+      goes out scope.(lifetime is end)
+      this restrict can prevent data race at compile time.
+      when we got a mutable reference,no one can got an immutable reference,it
+      can only do this after this mutable reference is goes out of scope;and as
+      same as the conversely.(immutable _references_ go out of scope)
+
+    ! scope of reference is different from variable's scope.for a reference,its
+      lifetime is start from where it has declared,and continue to the last time
+      the reference is used,such scopes,can not overlap.
+          let x = 0;
+
+          // scope starting of @imm_ref_x.
+          let imm_ref_x = &x;                   
+          ...
+          let y = *imm_ref_x; // use the immutable reference,the last usage.
+          // scope ending of @imm_ref_x.
+
+          // scope starting of @m_ref_x.
+          let m_ref_x = &mut x; // OK
+          ...
+          let z = *m_ref_x; // last usage of the mutable reference.
+          // scope ending of @m_ref_x.
+
+          let imm_ref1_x = &x; // OK
+
+          // such these scopes are can be known at compile time.
+
+Dangline References >
+    dangline references are easily to cause error about used after freed,
+    or been given to someone.
+
+    in rust,the compiler guarantees that references will never be dangling
+    references.if we have a reference to some data,the compiler will ensure
+    the data will not go out of scope before the reference to the data does.
+    in other word,the data will not be dropped before its reference go out
+    of scope.
+        fn make_dangle() -> &String {
+            let s = String::from("dangle");
+            &s  // compiler will throws error
+        }
+    for prevent this,we can return object via move semantics to instead
+    return reference.    // return ownership
+
+The rules of references >
+    at any given time,we can have either one mutable reference or any number of
+    immutable references.
+    references must always be valid.
+
+The Slice Type >
+    slice let us reference a contiguous sequence of elements in a collection.
+    a slice is a kind of reference,so it does not have ownership.
+    that is,we can reference to a part of the sequence instead to reference 
+    the entire.
+        let s = String::from("Hello, world");
+                             #^index 0
+
+                    // range-syntax,default is half-open.
+        let hello = &s[0..5]; // slice type,@hello refers to @s,
+                              // start from index 0,end at index 5.
+                              // index range is [0, 5).
+                              // and index [0, 4] => "Hello".
+        let world = &s[7..12]; // same as @hello,refers to "world".
+                               // index range is [0, 12).
+    rust range syntax implies start index is 0,end index is the sequence ending
+    more than one.so we can do
+        let hello = &s[..5];
+        let world = &s[7..];
+    if we want a slice refers to entire sequence,we can omit start and end as well.
+        let entire = &s[..];
+    the type descriptor for slice type reference to string is "&str".
+        fn first_work(s: &String) -> &str {
+            ...
+            &s[..]  // entire,but we also can slice a part,in other branch.
+        }
+    because slice is a reference,if the original target becomes invalid before
+    the last usage of this reference,compiler will throw error.so we can ensure
+    the slice always is valid unitl its last usage.
+    ! slice type is reference,thus it also following the rule about creating
+      immutable reference and mutable reference at same time.
+
+    in rust,the string literal implies a slice type.
+        let s = "hello"; // @s is &str,the slice type.
+    slice type can also be used as function parameter's type.
+        fn recv_slice(s: &str) -> &str {
+            ...
+        }
+
+    rust also provides array slice,and other slices.for array slice,its type
+    is &[<data-type>].
+        let x = [0, 1, 2, 3, 4, 5];
+        let array_slice = &x[0..4]; // slice [0, 4) => [0, 3]
+                                    // contains: 0, 1, 2, 3
+                                    // type of @array_slice is &[i32].
+
+    ! the reason compile throw an error when original becomes invalid before
+      last use of slice is
+          for invalidate the original target,drop() need a mutable reference
+          to it.
+          and slice is reference,it following the rule about reference creating.
