@@ -706,10 +706,12 @@ The Slice Type >
                               // and index [0, 4] => "Hello".
         let world = &s[7..12]; // same as @hello,refers to "world".
                                // index range is [0, 12).
-    rust range syntax implies start index is 0,end index is the sequence ending
-    more than one.so we can do
+    when producing slice type object,the rust range syntax implies start index is 0,
+    end index is the sequence ending more than one.so we can do
         let hello = &s[..5];
         let world = &s[7..];
+
+        ! we cant omit the range boundary in the for-cycle when using range syntax.
     if we want a slice refers to entire sequence,we can omit start and end as well.
         let entire = &s[..];
     the type descriptor for slice type reference to string is "&str".
