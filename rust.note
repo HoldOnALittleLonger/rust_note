@@ -744,3 +744,230 @@ The Slice Type >
           for invalidate the original target,drop() need a mutable reference
           to it.
           and slice is reference,it following the rule about reference creating.
+
+Rust Structure :
+^^^^^^^^^^^^^^
+
+keyword "struct" can be used to define a structure.
+    struct TheStruct {
+        @member-name: <type>,
+        ...
+    }
+for instantiate a structure,we can do this same as declare a variable and init it.
+    let obj: TheStruct = TheStruct {
+        @member-name: <initializer>,
+        ...
+    }; // initializing order regardless.
+
+    let obj = TheStruct {
+        @member-name: <initializer>,
+        ...
+    };
+
+operator "." can be used on structure object to access its member.
+    obj.@member-name = ...; // assignment
+    obj.@member-name += ...; // obj.@member-name = obj.@member-name + ...
+    // like the member access operator in C and C++.
+note that,if we want to modify a member of a structure,then this structure must
+be _entire_ mutable. // rust does not support mutable on certain member.
+
+we can return a new structure object from a function.
+    fn ret_structure() -> TheStruct {
+        TheStruct {
+            @member-name: <initializer>,
+            ...
+        }
+    }
+
+rust support init shorthand syntax,when we has a object whose name is same as 
+the structure member's name,and we want use the object to initialize that member.
+we can omit initializer of that member.
+    let member-name = 5;
+    let obj = TheStruct {
+        member-name,
+        ...
+    };
+
+if we want to create another object has the same type as previous object,we can
+use the previous object's member to initialize this new object.
+    let obj = TheStruct {
+        ...
+    };
+
+    let obj1 = TheStruct {
+        @member-name: obj.@member-name,
+        ...
+    };
+follow this way,we need to write a lot of things,thus rust does support the
+update syntax.
+    let obj = TheStruct {
+        ...
+    };
+
+    let obj1 = TheStruct {
+        @member1-name: <initializer>,
+        ..obj // this is the update syntax.
+    };
+where ".." means the remain fields of @obj1 will initialized from @obj's members.
+!! rust update syntax works like the "=" assignment,that means it will apply
+   move semantics on the assignment.for on stack object,copy semantics will be
+   applied.
+
+we also can define tuple struct,such structure has no detail of member definitions.
+    struct TupleStruct(<type1>, <type2>, ...);
+    let t = TupleStruct(<initializer1>, ...);
+this is useful when member name is less importance,and we want to give a meaningful
+name to a tuple,to distinguish from other tuples.
+
+rust does support unit-like struct,such struct is useful to implement a trait for
+other types.
+    struct UnitLikeStruct;  // definition
+    let obj = UnitLikeStruct; // declare
+
+we can also specify the member's type of a struct is a reference,which will refers
+to another data.
+but for do this,we need to specify the use of lifetimes.
+    struct RefStruct {
+        ref1: &<lifetime specifier> i32,
+        ...
+    }
+lifetimes ensure that the data referenced by a struct is valid for as long as
+the struct is.
+
+generally,we can not println!() a struct object,because maybe the structure has
+not implemented method "std::fmt::Display".
+we can force to print the structure's detail by apply the outer attribute
+"#[derive(Debug)]".
+    #[derive(Debug)]
+    struct TheStruct {
+        one: i32,
+        two: i32,
+    }
+
+    let obj = TheStruct {
+        one: 1,
+        two: 2,
+    };
+
+    println!("@obj is {obj:?}"); // debugging print.
+! the attribute "#[derive(Debug)]" only effects the next most neared definition.
+  so we need
+      #[derive(Debug)]
+      struct TheStruct {
+          ...
+      } // TheStruct is Debug derived.
+  we can do this but
+      #[derive(Debug)]
+      struct NewTuple(u32, u32, u32); // NewTuple is Debug derived.
+
+      // now TheStruct has no Debug attribute derived.
+      struct TheStruct {
+          ...
+      }    
+
+another way is use the "dbg!" macro,which takes ownership of an expression,
+prints the file and line number of where that "dbg!" macro call occurs.
+! println!() takes a reference.
+    #[derive(Debug)]
+    ...
+    let obj = TheStruct {
+        one: dbg!(1),
+        two: dbg!(2),
+    };
+
+a language can be object-oriented must need to support member method,such method
+describes what actions we can take on the object.
+in C
+    struct obj {
+            int x;
+            void (*modify_x)(struct obj* obj, int new_value);
+    };
+
+    void obj_modify_x(int new_value)
+    {
+            obj->x = new_value;
+    }
+
+in C++
+    struct obj {
+      void modifyX(int v)
+      {
+        x_ = v;
+      }
+
+      int x_;
+    }
+
+rust also support member method,but different from C and C++,it use the keyword
+"impl" to define member methods for a certain structure outside to the definition
+of this structure.  #^also called "associated function".
+    struct TheStruct {
+        x: i32,
+    }
+
+    impl TheStruct {
+        fn modify_x(&mut self, v: i32) {
+            self.x = v;
+        }
+
+        // &self is short of "self: &self".
+        // & -> we borrow ownership.
+        // no '&' means member method takes ownership,
+        // this is the rare case.
+        fn return_x(&self) -> i32 {
+            self.x
+        }
+    }
+where "self" works like the "this" pointer in C++ class methods.it refers to the
+object entity on which this method is called.
+the "self" type of an implementation is the type of the structure this implementation
+associated with.
+and member method _must_ has the first parameter named "self".
+we need to ensure the name of implementation must be the same as the name of the
+structure this implementation wants associate with.
+method's name can be same as the member name of the structure,similar to C++.
+
+invoke member method
+    let obj = TheStruct {
+        x: 5,
+    };
+
+    // for return_x() &obj will be passed
+    println!("@obj.x is {}.", obj.return_x());
+    obj.modify_x(10); // for modify_x() &mut obj will be passed
+    println!("@obj.x is {}.", obj.return_x());
+
+    // @obj is called the receiver of the member method.
+    // rust adds '&' '&mut' or '*' to the object for matches the
+    // signature of member method.
+    // thi is called "automatically referencing and dereferencing".
+
+we can let the associated function to return a new object,such method is called
+"new method",and we can call to such method do not need an object entity,but
+instead,we need to call it through namespace operator "::".
+such associated method do not requires the first parameter is "self".
+    impl TheStruct {
+        fn new(x: i32) -> Self {
+            Self {
+                x,
+            }
+        }
+    }
+
+    let new_obj = TheStruct::new(20);
+where "Self" is different from "self","Self" is a keyword,it represents the type
+this "impl" associated with.
+
+rust allows separate member methods into several "impl" definitions,this is very
+similar to the namespace definition in C++.
+    impl TheStruct {
+        fn return_x(&self) -> i32 {
+            self.x
+        }
+    }
+
+    impl TheStruct {
+        fn modify_x(&mut self, v: i32) {
+            self.x = v;
+        }
+    }
