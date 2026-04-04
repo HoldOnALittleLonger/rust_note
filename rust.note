@@ -971,3 +971,174 @@ similar to the namespace definition in C++.
             self.x = v;
         }
     }
+
+Enums and Pattern Matching :
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+enumeration can be used to represent a type has several possible variants,and
+an object has such type can only one of the possible variants at same time.
+    enum <enumeration-name> {
+        <enumerator>,
+        ...
+    }
+we usually name the @enumerator with upper case characters,like a constant.
+    enum ColorEnum {               //^OK,this is the convention in C and C++.
+        RED,
+        BLUE,
+        BLACK,
+        ...
+    }
+    let current_color = ColorEnum::RED; // create enumeration instance.
+generally,program can use the enumeration object as the identifier to determine
+what action should be taken for specified resource.
+    fn handle_red(c: ColorEnum) {
+
+    }
+
+    fn handle_blue(c: ColorEnum) {
+
+    }
+
+    ...
+
+    fn handle_color(c: ColorEnum) {
+        if c == ColorEnum::RED {
+            handle_red(c);
+        } else if c == ColorEnum::BLUE {
+            handle_blue(c);
+        }
+        ...
+    }
+we usually let the resource structure to contains an enumeration object to
+identify what current resource is for the same resource type.such use it to
+identify the version information.
+rust does support enumerator has other type than integer.
+    enum ColorEnum {
+        RED(u8, u8, u8),
+        BLUE(u8, u8, u8),
+        ...
+    }
+    // we use the tuple to store the color numbers.
+
+    let red = ColorEnum::RED(255, 0, 0);
+                            #^invoke constructor,automatically created.
+and rust,does not requires the types of each enumerator must be the same.
+    enum ErrorEnum {
+        ERROR_GENERAL(u8),
+        ERROR_FATAL(u8, String),
+    }
+    let error_result = ErrorEnum::ERROR_FATAL(-32, String::from("fatal error"));
+
+rust allows we to define method implementations for an enumeration type.as same
+as the structure,keyword "impl" is needed.
+    impl ErroEnum {
+        fn handle_fatal_error(&mut self) {
+            ...
+        }
+    }
+    let mut error_result=ErrorEnum::ERROR_FATAL(-32, String::from("fatal"));
+    error_result.handle_fatal();
+
+rust standard library provides a pre-defined enumeration type,named "Option".
+"Option" can be used to describe a value could be something or it could be nothing.
+for represent it,tradinal language such C and C++ use NULL value to descripbes
+the object current is invalid.
+when we try to use a NULL object as a not-null object,this usually cause the
+fatal error at runtime.compiler would not tell us the bad using of NULL object.
+such problem is "assuming that something is not null when it actually is null.".
+by use "Option",we can not process some actions on it when it is invalid,if we
+did,compiler will throw error.
+    enum Option<T> {
+        None,
+        Some(T),
+    } // generic in rust.
+    let valid_Option = Option<i32>::Some(10);
+    let invalid_Option = Option<i32>::None;
+
+    // if we used @invalid_Option eventually because we have forgot
+    // it has not been initialized,compiler will tell us this error.
+! we can use Option directly from std without "::".
+
+The "match" Control Flow Construct >
+    keyword "match" is used specify a match-expression.
+        match @v {
+            @pattern => @action,
+            ...
+        }
+    where @v usually is an object will be compared with the patterns,and
+    @pattern can be made up of literal values,variable names,wildcards,etc.
+    if the first matched pattern occurs,the @action(code block) corresponds to that
+    pattern will be executed.
+    @action can be compound statement.
+    ! similar to the switch statement in C and C++.
+
+    match-expression supports variable binding between match value's parts and match pattern arm.                                            
+                                                                    #^usually is the inner
+        enum Enum {
+            ENUM(String),
+        }
+        match e {
+            Enum::ENUM(s) => {
+                // in this compound statement,@s is bound to the
+                // String object which is inside the enumerator ENUM.
+            }
+        }
+
+        let e = Enum::ENUM(String::from("binding"));
+                           #^@s will be bound to this object.
+    we can combine Option<T> with the match-expression,manipulate the option object
+    if and only if it is not None.
+        let x = Option<i32>::Some(10);
+        match x {
+            None => None,
+            Some(v) => Some(v + 1),
+        }
+    we let the inner increase by 1 if @x is not None.
+
+    result of match-expression is the result of that matched arm's.
+
+    usually,we need list all possible patterns for the match-expression corresponding
+    to that match value.
+    but,because match pattern supports wildcards,so we can take a predefined action
+    for all other pattern.(catch-all arm)
+        match v {
+            ...
+            other => @action,
+        } // if @v is ENUM(String),@other is bound to the String object.
+
+        match v {
+            ...
+            _ => @action,
+        }
+    where @other is the catch-all pattern,when this pattern is matched,@other
+    will be bound to the inner of @v.
+    '_' is placeholder,it similar to @other,but without variable binding.
+    ! a null tuple () can be used as the result of match-expression.
+    ! the catch-all arm must be the last one of match-expression.
+    ! catch-all => "default:" branch of switch statement in C and C++.
+
+"if let" and "let...else" >
+    "if let" syntax can let us combine "if" and "let" to handle values that match
+    one pattern while ignore the rest.
+        let e = Enum::ENUM(String::from("if let"));
+        if let Enum::ENUM(s) =  e {
+            // @s is bound to the String object.
+        }
+        // of course,we can also use two arms match-expression to implement this.
+    an "else" branch can follow the "if let",such branch similar to the placeholder
+    pattern in match-expression.
+    the compound statement of "if let" can contains another "if..else" statement,
+    for handle further case,and in that branch,part binding been happened.
+
+    "if let" can be used with the "let" keyword to declare an object.
+        let x = if let ... ;
+    but a more concise version is exist.
+        let x = Enum::ENUM(String::from("let..else"));
+        let Enum::ENUM(s) = x else {
+            ...
+        };
+    the example is,if @x matched the pattern,declare an object named @s,bind to
+    the inner string object of @x;otherwise,execute the else branch.
+
+    
+    
