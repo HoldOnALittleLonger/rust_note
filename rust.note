@@ -1140,5 +1140,262 @@ The "match" Control Flow Construct >
     the example is,if @x matched the pattern,declare an object named @s,bind to
     the inner string object of @x;otherwise,execute the else branch.
 
+Packages,Crates,and Modules :
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Packages => a cargo feature that lets us build,test,and share crates.
+Crates => a tree of modules that produces a library or executable.
+Modules and use => let us control the organization,scope,and privacy of paths.
+Paths => a way of naming an item,such as a struct,function,or module.
+
+a crate is the smallest amount of code that the rust compiler considers at a time.
+a crate has one of the two form,executable or library.
+the crate root is a source file that the rustc starts from and makes up the root
+module of the crate.
+
+a package is a bundle of one or more crates that provides a set of functionality.
+a package contains a "Cargo.toml" file,it describes how to build those crates.
+a package can contains a lot of binary crates,but at most only one library crate.
+a package must contains at least one crate.
+! convetion: src/main.rs of project directory is the crate root of a binary
+             crate with the same name as the package.
+             if only src/lib.rs is exist,then this file is the library crate root.
+a package can has multiple binary crates by placing files in src/bin,each file
+will be a separate binary crate.
+
+keyword "mod" can be used to declares a module,and keyword "pub" apply on a
+module can let the module become public,if no "pub" keyword,"mod" will declare
+a private module by default.
+    mod new_module; // private
     
+    pub mod new_module; // public
+"mod" keyword tell rustc to include the code of that module into current file,
+"pub" means the module is global visible.
+
+rustc's work >
+    start from the crate root
+        main.rs
+    declaring modules
+        checks whether the crate root has declaring modules.
+        lookup module's code in
+            in main.rs
+            src/<module-name>.rs
+            src/<module-name>/mod.rs
+    declaring submodules
+        checks whether the module has submodules.
+        lookup submodule's code in
+            parent module's source file
+            src/<parent-module-name>/<submodule-name>.rs
+            src/<parent-module-name/<submodule-name>/mod.rs
+    paths to code in modules
+        once a module is part of the crate,we can refer to code
+        in that module from anywhere else in that same crate,
+        as long as the privacy rules allow.
+    private VS. public
+        code within a module is private from its parent modules
+        by default.
+        if "pub" keyword is given,then the module is public.
+    the "use" keyword
+        within a scope,the "use" keyword creates shortcuts to items
+        to reduce repetition of long paths.
+
+we can group related code in modules,this also rely on the "mod" keyword.
+    mod <module-name> {
+        mod <submodule-name> {
+            ...
+        }
+        ...
+    } // module definition
+modules can also hold definitions for other items,such as structs,enums,constants,
+traits,and functions.
+this is similar to C++ namespace.as the same,if the items in a module is not global
+visible,then we need to use operator "::" to access them.
+a path can take two forms >
+    1> an absolute path is the full path starting from a crate root.
+       for external crate,path begins with the crate name.
+       for current crate,path begins with the literal "crate".
+    2> a relative path starts from the current module and use "self","super",
+       or an identifier in the current module.
+path identifiers in the path is separated by "::".
+    mod module_x {
+        mod submodule_x {
+            fn func() { }
+        }
+    }
+
+    // there "pub" is used to expose the public API.
+    pub fn pub_func() {
+        crate::module_x::submodule_x::func(); // absolute path
+    
+        module_x::submodule_x::func(); // relative path
+    }
+    // because submodule_x is private module,thus rustc will throw error
+    // if we just compile the example.
+
+we can expose paths with the "pub" keyword.
+    module module_x {
+        pub mod submodule_x {
+            fn func() { }
+        }
+    }
+now the submodule submodule_x becomes public,but this is not enough.the submodule
+becomes public,the contents in the submodule still private.
+so,we need to expose the private contents,too.
+    module module_x {
+        pub mod submodule_x {
+            pub fn func() { } // expose func() as public,
+                              // no"pub" keyword,the function
+                              // is private item by default.
+        }
+    }
+
+we can construct relative paths that begin in the parent module,rather than the
+current module or the crate root,by using "super" at the start of path.
+    mod module_x {
+        fn func() {}
+        mod submodule_x {
+            fn func() {
+                internal_func();
+                super::func();
+            }
+
+            fn internal_func() { }
+        }
+    }
+
+we also can make the structs and the enums public,by use "pub" keyword.
+if we want the structure become public,then we can
+    mod module_x {
+        pub struct X {
+            field1: i32,
+            field2: u32,
+        }
+
+        impl X {
+            pub fn access_field1(&self) -> i32 {
+                self.field1
+            }
+        }
+    }
+the structure and the interface become public,they can be accessed by external
+crate.but we can not access to the fields directly,if we want to allow that,
+need to apply "pub" on the fields.
+    mod module_x {
+        pub struct X {
+            pub field1: i32, // public field
+            field2: u32, // private field
+        }
+    }
+! in a binary crate,we might define structure in the global scope.in that case,
+  we can access to the field directly,but if we put them into module,private will
+  be default behavior.
+public enum as same as the structure,except we usually do not apply "pub" on the
+enumerators.
+
+keyword "use" can be used to bring paths into scope,like the "using" keyword in
+C++.
+    use crate::module_x::X;
+    // now the structure X is visible directly in current scope.
+    // same as we did to bring std::string to main scope.
+
+    use crate::module_x::submodule_x;
+      //^current crate,absolute path.
+
+    mod module_y {
+        fn func() {
+            submodule_x::func(); // ERROR
+            super::submodule_x::fun(); // OK
+        }
+    }
+    // the reason is,when we define a module,the name resolve default is inside
+    // current module.if we want to access parent scope,then need the relative
+    // path identifer to specify that.
+    // or we can use the "use crate::module_x::submodule_x::func;" at the
+    // top scope,then we can invoke the func() directly without "super"
+    // identifier.
+
+keyword "as" can be used together with "use" to alias a type.
+    use std::io::Result as IoResult;
+there "IoResult" is the new name of the type std::io::Result in current crate.
+! in C and C++,"typedef" and "using" can do the same.
+
+when we bring a name into scope with the "use",the name is private to the scope
+into which we imported it.but we can re-export the name from this scope,"pub"
+can does this.
+    pub use crate::module_x::submodule_x::func;
+    // re-export,now func() in that module can be accessed by external code.
+
+we can use external packages,section "dependencies" of the file "Cargo.toml" is
+used to specify external packages.if we specified one and our code has used the
+parts of external packages,then cargo would automatically download it during
+compile time.
+    // Cargo.toml
+    [dependencies]
+    rand = "0.8.5"
+
+    // main.rs
+    use rand::Rng;
+
+we can combine several same prefix paths into one "use".
+    use std::cmp::Ordering;
+    use std::io;
+
+    =>
+
+    use std::{cmp::Ordering, io};
+special name "self" can be used in the combinition to use the module itself.
+    use std::io;
+    use std::io::Write;
+
+    =>
+
+    use std::io{self, Write};
+
+wildcards '*' can be used in "use" statement,it will brings all public items from
+that module into current scope.
+    use std::collections::*;
+
+similar to C++,when we have several modules in our rust program,we can separate
+them into different files.
+! in C++,we separate namespace definitions into different files.
+keyword "mod" can be used to declare a module at current scope.
+because rustc lookup the module from the file has the same module name,thus,
+usually one source file can only has one main module.
+    // module_x.rs
+    pub mod module_x {
+        pub fn func() { }
+    }
+
+    // lib.rs
+    mod module_x;
+    pub use crate::module_x::func;
+! if we separate modules into different files,the file can also be a private module implicitly.
+      // module_x.rs
+      pub fn func() { }
+  there,the file "module_x.rs" will corresponds to a module named "module_x",and its
+  contents just a public function named @func.
+  then we can import it into main.rs
+      mod module_x;
+      use crate::module_x::func;
+
+      fn main() {
+          func();
+      }
+
+  another method is,touch a file named "module_x.rs".
+      // src/module_x.rs
+      pub mod module_y;
+  create a directory named "module_x",and touch a file named "module_y.rs".
+      // src/module_x/module_y.rs
+      pub fn func() { }
+  and we can invoke the function in main.rs
+      // src/main.rs
+      mod module_x;
+      use crate::module_x::module_y::func;
+!! IF WE WANT A PACKAGE TO CONTAINS BOTH BINRAY CRATE AND LIBRARY CRATE,WE NEED TO
+   ADJUST THE FILE "Cargo.toml".
+
+
+    
+
     
