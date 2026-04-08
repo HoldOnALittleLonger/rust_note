@@ -1058,6 +1058,14 @@ did,compiler will throw error.
     // if we used @invalid_Option eventually because we have forgot
     // it has not been initialized,compiler will tell us this error.
 ! we can use Option directly from std without "::".
+! if we want to match Option<T> object,we can just list the pattern
+      None
+      Some(@e)
+  to instead list the pattern in the style
+      Option::<T>::None
+      Option::<T>::Some(@e)
+  note that,if we list the pattern in the style "Option<T>::None",
+  rustc will throw error.because generics need specify lifetime.
 
 The "match" Control Flow Construct >
     keyword "match" is used specify a match-expression.
@@ -1395,7 +1403,237 @@ usually one source file can only has one main module.
 !! IF WE WANT A PACKAGE TO CONTAINS BOTH BINRAY CRATE AND LIBRARY CRATE,WE NEED TO
    ADJUST THE FILE "Cargo.toml".
 
+Common Collections :
+^^^^^^^^^^^^^^^^^^
+
+collections is the useful data structures inclued in rust standard library.
+such data structure can contain multiple values,and the element in the collection
+is stored on the heap.
+! similar to C++ container.
+    
+collection Vec<T> >
+    a vector,can store more than one value in a single data structure,each element
+    in the collection is next to each other in memory,and vector can only holds
+    one type of element.rust vector is defined in module "std::Vec".
+        let iv: Vec<i32> = Vec::new(); // empty collection with certain type.
+
+        let iv1 = Vec![1, 2, 3]; // type is auto deduced to i32,integer default.
+                //^initilization
+    member method push() can be used to update a vector object.
+        iv.push(1);
+        iv.push(2);
+        iv.push(3);
+        // @iv must be mutable.
+    and push() method will borrow the "self" in mutable,this means,if we
+    have an immutable reference to an element in this collection,before
+    leave the immutable scope,push() method would not work. 
+        let rfirst: &i32 = &iv[0]; // immutable reference.
+        v.push(4); // need mutable borrow @iv.
+        // this is because add new element at the end will cause re-allocation,
+        // we might need to copy the old elements into the new space,if there
+        // is not enough room to store this new element.
+        // after copying,the old memory space will be deallocated,thus @rfirst
+        // points a invalid element.
+    the subscript operator [] can be applied on a vector to access the element.
+        iv[0]
+        iv[1]
+        ...
+    and there also a member method get() can be used to access the element.
+    but different from [],get() method returns a value is type of Option<&T>.
+        let x = iv.get(0); // Option<&i32>
+    if we access an element through [] outside to the vector's range,then a
+    runtime panic will happens,and program will crash.
+    for get() method,the special value "None" will be returned,no panic happens.
+    ! rustc can not detect [@bad_area] error because vector can dynamically grow
+      or shrink at runtime.
+    ! we can use operator '&' on vector's get() method to get the reference to
+      that Option<T> object instead to copy a new Option<T>.
+          &iv.get(0)
+
+    vector support for-cycle to iterate each element in the collection.
+        for i in &iv {
+            ...
+        } // borrow @iv with immutable
+
+        for mi in &mut iv {
+            ...
+        } // borrow @iv with mutable
+    a vector object will be destructed(dropped) when it goes out to its scope,
+    this will also drops all elements in it.
+
+    because vector can only holds one type,but this limitation is not enforced
+    onto the type it holding.
+    so if we want to store several types,we can use structure or enumeration,and
+    let vector to holds the struct type or enum type.
+    in this case,r/w method of vector will return the object that is type of the
+    compound type.
+        enum ENUM {
+            Int(i32),
+            Float(f32),
+            Text(String),
+        }
+
+        let mut v: Vec<ENUM> = vector::new();
+        v.push(ENUM::Int(2));
+        v.push(ENUM::Float(3.2));
+        v.push(ENUM::Text(String::from("text")));
+
+collection String >
+    rust strings are implemented as a collection of bytes,with some methods
+    to provide useful functionality when those bytes are interpreted as text.
+
+    we can conver &str to a String object,through the to_string() method of the
+    &str.
+        let s = "the string";
+        let sstr = s.to_string();
+
+        let sstr1 = "the string".to_string(); // OK
+    method from() of String means construct a String object from the given text.
+    rust strings are UTF-8 encoded.
+
+    method push_str() can be used to update the String object,it effect is append
+    the text passed to it at the end of it receiver -- the String object.
+        let mut hstr = String::from("Hello");
+        let s = " world";
+        hstr.push_str(s);
+
+        hstr.push_str(" world"); // OK
+    and of course,just push one character to the String object also permitted,
+    member method push() is used to do this.
+        hstr.push('x');
+    except member method push_str(),the operator '+' can be used to combine
+    two strings.
+        let s1 = String::from("Hello ");
+        let s2 = String::from("world!");
+        let s3 = s1 + &s2; // the operands' order is important.
+    in this expression,the operator '+' actually uses the method add() to
+    combine strings,and its prototype may like this
+        fn add(self, s: &str) -> String { ... }
+    @s2 has prefixed '&' that is because we can only add a string slice to a 
+    String object.
+    ! rust coerce &String argument into a &str.
+          &s2 => &s2[..]
+
+    rust provides "format!" macro,it allows we to combine strings in more
+    complicated ways.
+        let s1 = String::from("YYYY");
+        let s2 = String::from("MM");
+        let s3 = String::from("DD");
+        let time_string = format!("{s1}-{s2}-{s3}"); // result is String object
+        // @time_string => "YYYY-MM-DD"
+    ! format!() macro does not take ownership of strings,it uses references of
+      them.
+
+    String does not support subscript operation,because it support all UTF-8
+    encoded characters,different string has different length than the length of
+    that literal string.besides this,subscript operation on string would returns
+    a byte value,not a character.and,rust would have to walk through the
+    contents from the beginning to the index([@idx]) to determine how many
+    valid characters there were,but operator [] expects O(1) time complexity,
+    in rust,this is not possible.
+
+    rust provides different ways of interpreting the raw string data that computers
+    store so that each program can choose the interpretation it needs,no matter 
+    what human language the data is in.
+    
+    we can use &@String-obj[@range] to get a slice object,but we must specify
+    the valid range,in other word,the range can not begins at the middle of
+    a character's byte,and can not ends at the middle of a character's byte.
+    for example,if the character is 2 bytes,then the start and the end of range
+    must be multiple of 2.
+        [0..2], [0..4], ... // OK
+        [0..1], [0..3], ... // ERROR,runtime panic
+
+    we can iterate each character in a string through for-cycle.
+    the best way is to explicit the characters or bytes that we want to iterate.
+                 // to characters
+        for c in "text".chars() {
+            ...
+        }
+
+                       // to bytes
+        for b in "text".bytes() {
+            ...
+        }
+
+        // "text" is &str type.
+
+collection Hash Maps >
+    the type HashMap<K, V> stores a mapping of keys of type K to values of type V
+    using a "hashing function",the function determines how it places these keys
+    and values into memory.(so HashMap<> is not ordered)
+    for a HashMap,we can address the value through specified key;similar to the
+    index on vector.
+
+    HashMap is defined in standard library module "collections".
+        use std::collections::HashMap; // use module
+
+        let mut map: HashMap<u32, String> = HashMap::new();
+        map.insert(0, String::from("Zero"));
+        map.insert(1, String::from("One"));
+    all of the keys have the same type,all of the values have the same type.
+
+    member method get() can be used access element in HashMap,it requires the
+    key to find out corresponding value,and it will returns an Option<&V> object.
+    we can invoke method copied() to let the Option object wraps ownership rather
+    than reference.
+    method unwrap_or() can be used to handle the case no such key entry is exist
+    in this collection.
+        let x = map.get(0).copied().unwrap_or(String::from("no such entry"));
+        // if no such entry,the String object from "no such entry" will be returned.
+
+    rust supports for-cycle on HashMap to iterate its elements.
+        // @key bind to current mapping's key
+        // @value bind to current mapping's value
+        for (key, value) in &map {
+            ...
+        }
+
+    for types that implemented Copy trait,the object will be copied into HashMap,
+    but for the heap based object,move semantics will be applied,that means the
+    HashMap become the owner of that object.
+    HashMap can stores the references to heap objects,in this case,no move will
+    happens,but the original object must be valid for at least as long as the 
+    HashMap is valid.
+
+    the new value of the same key been exist into HashMap will replace the old
+    value,if we insert the same key with different value more than once.
+        map.insert(0, String::from("one"));
+        map.insert(0, String::from("new one")); // "new one" replace "one".
+    the old value will be auto dropped.
+
+    member method entry() can be used to check whether the given key does exist
+    in the HashMap.it returns an object is type of Entry enum,which represents
+    a value that might or might not exist.
+    because HashMap implemented with unique key,so we can use this method to 
+    insert a new key-value pair if and only if the key is not exist.
+        map.entry(0).or_insert(String::from("new one"));
+    where method or_insert() will be called when Entry represents None such
+    key-value,it will create a new key-value pair and insert it into HashMap.
+    the key is same as the checked key.
+    or_insert() returns a mutable reference to the _value_ for that Entry key if
+    such key existed;otherwise,it returns a mutable reference to the new value.
+
+    by use or_insert(),we can achieve the logic
+        if there been a given key is exist in HashMap,then we update its value.
+        if there no such key is exist in HashMap,then we create new pair,insert
+        it into HashMap,and initialize its value.
+
+            let ref = map.entry(0).or_insert(0);
+            *ref += 1; // new value has value 1,
+                       // old value increase by 1.
+
+    the default hash function of HashMap is called "SipHash",it has most security
+    but slower than other hash function.
+    we can switch to another hash function by specify a hasher,
+    a hasher is a type that implements the BuildHasher trait.
+
+
 
     
 
-    
+
+
+
+
+
