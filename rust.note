@@ -1125,6 +1125,17 @@ The "match" Control Flow Construct >
     ! the catch-all arm must be the last one of match-expression.
     ! catch-all => "default:" branch of switch statement in C and C++.
 
+    we can combine keyword "match" and keyword "let" to use match-expression when
+    declaring a variable.
+        let var = match @v {
+            @pattern1 => @value1,
+            @pattern2 => @value2,
+            ...
+        };
+    but,we must ensure the types of values for those patterns are the same type.
+    this is because rustc need to knows what is type of @var is at compile time.
+    if @value1 is i32,then it expects @value2 also is i32,and so on.
+
 "if let" and "let...else" >
     "if let" syntax can let us combine "if" and "let" to handle values that match
     one pattern while ignore the rest.
@@ -1628,12 +1639,128 @@ collection Hash Maps >
     we can switch to another hash function by specify a hasher,
     a hasher is a type that implements the BuildHasher trait.
 
+Error Handling :
+^^^^^^^^^^^^^^
 
+rust groups errors into two categories,the recoverable and the unrecoverable.
 
-    
+rust macro "panic!" can be used to stop execution of program when we encountered
+an unrecoverable error.
+program may implicitly panics,such we access the position into an array exceeded
+its end;or we invoke panic!() to explicitly trigger panic.
+by default,when program panics,rust will let the program print a failure message,
+unwind and clean up stack,then exit.
+of course,we can hand over the unwinding to operating system,when panic occurs,
+aborting will instead unwinding.
+for do this,we need to add "panic = 'abort'" into section "[profile]" of the 
+Cargo.toml file.
+    panic!("failure message"); // panic,print the panic message.
+if we have set environment RUST_BACKTRACE to 1,then rust will print backtrace,
+if we want to get verbose backtrace information,need to set this environment to
+'full'. // backtrace need Debug symbols.
 
+rust introduced a generic type Result<T, E>,it is enumeration type.
+    enum Result<T, E> {
+        Ok(T),
+        Err(E),
+    }
+where T represents the type of the value that will be returned in a success case
+within the @Ok variant,and E represents the type of the error that will be returned
+in a failure case within the @Err variant.
+we can use match-expression to extract the result.
+    use std::fs::File;
 
+    let file_result = File::open("./zero");
+    let f = match file_result {
+        Ok(the_file) => the_file,
+        Err(the_error) => panic!("error: {the_error:?}"),
+    };
+if we wont to stop program when the file is not exist,instead,we want to create it.
+then we can do 
+    let f = match file_result {
+        Ok(the_file) => the_file,
+        Err(the_error) => match the_error.kind() {
+            ErrorKind::NotFound => match File::create("./zero") {
+                Ok(handle) => handle,
+                Err(err) => panic!("create file failed"),
+            }
+            _ => panic!("unknown error"),
+        },
+    };
 
+    // there E of Result is type of std::io::Error.
+    // kind() is a member method of std::io::Error structure,
+    // this method return a value is type of std::io::ErrorKind,
+    // it has variants representing the different kinds of errors
+    // that might result from an "io" operation.
+    // std::io::Error provides unwrap_or_else() method to make the
+    // error handling logic more concise.
+    /*
+     * File::open("./zero").unwrap_or_else(|error| {
+     *     if error.kind() == ErrorKind::NotFound {
+     *         File::create("./zero").unwrap_or_else(|error| {
+     *             panic!("create file failed.");
+     *         })
+     *     } else {
+     *         panic!("unknown error");
+     *     }
+     * });
+     */ 
+unwrap() method of Result<> can extract the object is type of T wrapped in @Ok,
+but if we do not specify the error condition handling through other member
+function such unwrap_or_else(),the default action is panic!().
+expect() method of Result<> is different from unwrap(),it only be called if
+Result<> is Err(E).this method receives a description text for the error,and
+invoke panic!().
 
+in rust,we can let the functions to propagate the error it encountered to the
+caller,for do this,we need the function return Result<T, E>.
+similar to C++ throw an exception.
+    fn open_file(s: &str) -> Result<File, String> {
+        let f = File::open(s);
+        match f {
+            Ok(handle) => return Result::<File, String>::Ok(handle),
+            Err(err) => return Result::<File,String>::Err(
+                String::from("Open file failed.")),
+        }   // similar to Option<>,when we construct a generic object,
+    }       // we need to specify lifetime for it.
 
+in rust,symbol '?' can be used as a shortcut for Result<> object.
+    let f = File::open(s)?;
+if result is Ok,'?' is same as unwrap().
+if result is Err,'?' will conver E to the current function's return type,and
+return the converted object to caller.(early return)
 
+error values that have '?' operator called on them go through the 'from' function,
+defined in the 'From' trait in the standard library,which is used to convert values
+from one type into another.
+when the '?' operator calls the 'from' function,the error type received is converted
+into the error type defined in the return type of the current function.
+if we want '?' convert the error type to our custom error type,we need to give
+it the implementation for the conversion to From trait,describe how to convert
+standard library defined error type to our custom error type.
+    impl From<io::Error> {
+        fn to_our_cerror(e: io::Error) -> OUR_CERROR {
+            ...
+        }
+    }
+
+operator? can only be used in functions whose return type is compatible with the
+value the '?' is used on,generally,the value's type is Result<> or Option<>.
+// compatible: Err(E) => Result<T, E>, Some(T) => Option<T>
+// for Option<T>,'?' early return None.
+except the end of a statement,we can also use '?' at the middle of calling chain.
+    text.lines().next()?.chars().last()
+    //^&str            ^no next line,return None,otherwise continue on Some(T)
+
+in rust,main function can returns a value is type of Result<(), E>.
+// 0 or error code.
+except this type,the main function may return any types that implement the
+std::process::Termination trait.
+
+! call unwrap() if we have not decided to how to handle the error.
+! call expect() and document the reason,if we will think never have an Err variant.
+  when error case become possible,we can change expect() to other error handling 
+  resolution.
+
+! panic! if we end up in a bad state(fatal error,unexpected behavior,etc).
