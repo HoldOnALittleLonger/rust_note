@@ -3,7 +3,7 @@ Cargo :
 cargo is rust's build system and package manager.
 it handles code dependencies.
 
-create new project with cargo :
+create new project with cargo
     cargo new <project-name>
 this will create a new directory named <project-name>.
 in which directory,a file name "Cargo.toml" is created,the file describes the
@@ -196,6 +196,11 @@ tuple type >
       let z = tup.2;
       // similar to the member accessor in C/C++.
 
+    ! if we want to pass a tuple to a function as its parameter,then we can
+          fn func(t: (<type1>, <type2>, ...)) { }
+          fn func(t: &(<type1>, <type2>, ...)) { }
+          fn func((x, y): (<type1>, <type2>)) { }
+
 array type >
     an array is a collection of values have the same type.
     for declare an array,we can do:
@@ -233,6 +238,10 @@ array type >
       did that will throw error and panicked.
       if we specify the index to an array with a constant,then this error will be
       detected by compiler during compile time.
+    ! if we want a function to receive an array as its parameter,then we can
+          fn func(ary: &[<type>]) {
+              ...
+          }
 
 Functions :
 ^^^^^^^^^
@@ -1762,5 +1771,96 @@ std::process::Termination trait.
 ! call expect() and document the reason,if we will think never have an Err variant.
   when error case become possible,we can change expect() to other error handling 
   resolution.
-
 ! panic! if we end up in a bad state(fatal error,unexpected behavior,etc).
+
+Generic Types,Traits,and Lifetimes :
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+generics in rust is abstract stand-ins for concrete types or other properties.
+it allow us to replace specific types with a placeholder that represents multiple
+types to remove code duplication.
+usually,we do this rely on function calling,the generic allow us to improve this
+function to handle other types than a specific type by the same way.
+
+
+Generic Data Types
+------------------
+
+similar to C++,rust function can receives objects that of generic types,or
+return an object is type of generic type.
+    fn func<T>(x: &T) -> T {
+        ...
+    }
+'<>' is used to tell rustc 'T' is a generic type.
+when we invoke this generic function with parameters have certain types,rustc
+will use the certian types to replace the generic types.if some operations in
+that function is not supported by current types,rustc will throw error.
+we can apply trait on the generic type,to specify the type T should support
+some special operations,then we can do such operations in the function.
+    fn func<T: <trait-name>>(...) { }
+! because generic type T may not support to ordering,if we want to compare
+  objects has type T,we need to apply the trait std::cmp::PartialOrd on the
+  type T,to enable comparison.
+      fn func<T: std::cmp::PartialOrd>(ary: &[T]) -> &T {
+          ...
+      }
+
+structure and enumeration also support generic type.
+    struct Complex<T> {
+        a: T,
+        b: T,
+    }
+
+    enum Option<T> {
+        None,
+        Some(T),
+    }
+
+    enum Result<T, E> {
+        Ok(T),
+        Err(E),
+    }
+when auto deduction happens at compile time,the first initializer's type is the
+generic type T.
+
+if we want to provide some member methods for the generic structure,we need
+specify generic type for "impl" keyword,too.
+    //   +-- T just after 'impl' means we are
+    //   |   declaring implementation for generic type,
+    //   |   in the implementation,T is a generic type.
+    //   |  +-- the structure corresponds to this implementation
+    //   |  |
+    //   V  V  
+    impl<T> Complex<T> {
+        fn new() -> Complex<T> {
+            Complex<T> {
+                a: 0,
+                b: 0,
+            }
+        }
+
+        fn a(&self) -> &T {
+            &self.a
+        }
+
+        fn b(&self) -> &T {
+            &self.b
+        }
+    }
+similar to C++,rust also supports generic type specialization,in implementation,
+but the difference is,except the specified implementation,the specified type also
+has the methods defined in the generic type implementation.
+    impl Complex<f32> {
+        fn do_not_call(&self) {
+            panic!("EINVAL");
+        }
+    } // we define the additional implementation for specified type.
+when the object is type of Complex<f32>,then methods in this implementation will
+also be considered,so we can invoke do_not_call() on the object.
+for different types,implementations may provide different methods,this is OK,
+but all of them,sharing the implementation for generic type.
+! generic type will not slows speed of program at runtime.
+  rustc performs "monomorphization" at compile time.
+  the monomorphization is the process of turning generic code
+  into specific code by filling in the concrete types that are
+  used when compiled.
