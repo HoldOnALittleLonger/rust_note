@@ -44,6 +44,12 @@ compiles it and throws error mesage.
 // in C and C++,variable is mutable by default,keyword "const" is used to declare
 // a constant.we can also cast away the const,but actually compiler just create
 // a new temporary object same as the old object without "const" specifier.
+! if we want to defer the variable bound for an immutable variable,we can just
+  declare the variable without initialize it.
+  the immutable binding will happens at the first time assign a value to this
+  variable.
+  in other word,immutable variable can only be assigned once,but the time can be
+  deferred.
 
 keyword "const" is used to declare a constant.a constant is not immutable by default,
 it is always immutable.
@@ -1864,3 +1870,261 @@ but all of them,sharing the implementation for generic type.
   the monomorphization is the process of turning generic code
   into specific code by filling in the concrete types that are
   used when compiled.
+
+Defining Shared Behavior with Traits
+------------------------------------
+
+Trait => a particular characteristic that can produce a particular
+         type of behaviour.
+By specify traits to an object,we can define the common behaviours of objects
+that have the same traits.
+
+a trait defines the functionality a particular type _has_ and can _share_ with
+other types.
+a type's behavior consists of the methods we can call on that type.
+    trait <trait-name> {
+        fn <method>(...) -> <return_type> {
+            ...
+        }
+    }
+keyword "trait" is used to define a trait with specified name.in the definition,
+it is composed by some callable object(methods),those methods describe the
+behaviours of this trait,and the object has such trait need to support those
+methods,then we can group the objects together through trait.it is not "is-a",
+it just means they are similar things.
+! for example,in C++ standard library,STL specified some traits that must be
+  santisfied by the related container,then we can know the object is a STL
+  container.
+the above,define the default implementation for a trait.
+and we also can provide the special implementation for a trait that corresponds
+to specified type.
+    impl <trait-name> for <type-name> {
+        fn <method>(...) -> <return_type> {
+            ...
+        }
+    }
+if we want use the default implementation,just leave the 'impl' be empty as well.
+actually,we still need the 'impl' 'for' to apply a trait on a given type.
+    struct Complex { ... }
+    trait ComplexTrait { ... }
+    impl ComplexTrait for Complex { }
+
+    let v = Complex { ... };
+    v.trait_method(); // OK,ComplexTrait is applied on Complex type,thus
+                      // the methods in the trait implementation should be
+                      // supported by Complex type.
+usually,we just specify method prototype in trait definition,and provides the
+detail through 'impl' 'for' keywords.
+this is because,the default implementation maybe can not access to the fields
+in that compound type,such structure.
+    trait <trait-name> {
+        fn <method-name>(...) -> <return_type>;
+    }
+if we want to contruct a new object from a method of the trait's implementation,
+and which object's type is same as the type of object this trait applied to,
+we can let the method return 'Self' instead specify the certain type.
+    trait <trait-name> {
+        fn copy(&self) -> Self;
+    }   
+    impl <trait-name> for <my-struct> {
+        fn copy(&self) -> Self {
+            Self {
+                ...
+            }
+        }
+    }
+when the trait method is called from a receiver,"&self" is the reference to that
+object,and "Self" is the type of that object,this binding is accomplished by
+rustc.
+
+we can implement a trait on a type only if either the trait or the type,or both,
+are local to current crate.
+but we cant implement external traits on external types.
+    ---- "orphan rule"(coherence)
+
+traits can be used as parameters of a function.
+    fn func(p: &impl <trait-name>) -> <return_type> {
+        ...
+    }
+this function accepts any type that implements the specified trait,and in the
+function,we can call methods of that trait on the parameter @p.
+and we can also do this through generic type,but we need to make a bound between
+the generic type T and the trait.
+    fn func<T: <trait-name>>(p: &T) -> <return_type> {
+        ...
+    }
+! usually,we prefer to the "impl Trait" syntax than bind generic type.
+  the reason is,if the function need more than one parameters,we can
+  specify trait contraints on each parameter.
+  if all parameters use the same trait,generic type should be considered.
+we can specify the function's parameter is more than one traits applied on it.
+    fn func(p: &(impl <Trait> + <Trait> + ...)) -> <return_type> {
+        ...
+    }
+generic type syntax is 
+    fn func<T: <Trait> + <Trait> ...>(p: &T) -> <return_type> {
+        ...
+    }
+if there is more than one generic types of the function,specify traits for
+each generic type will let the generic type list and parameter list too long,
+hence will lost readability,so rust provides keyword "where" to allow us to
+specify traits for generic types at other place.
+    fn func<T, U, V>(t: &T, u: &U, v: &V) -> <return_type>
+    where
+        T: <Trait>,
+        U: <Trait>,
+        V: <Trait> + <Trait> + ...,
+    {
+        ...
+    }
+
+trait can also be applied on the return type of a function.
+    fn func() -> impl <trait-name> {
+        ...
+    }
+func() can return an object of any type that associated with the specified traits.
+but this is work only for return single type.if the function will returns one of
+two types that associated with the trait,rustc will throw error.
+    fn func() -> impl <trait-name> {
+        if true {
+            <TypeA> {
+                ...
+            }
+        } else {
+            <TypeB> {
+                ...
+            }
+        }
+    } // ERROR,even both TypeA and TypeB have the specified trait.
+
+rust supports provide different methods for generic type that has different trait.
+    struct Point<T> {
+        x: T,
+        y: T,
+    }
+
+    impl<T> Point<T> {
+        ...
+    }
+
+    impl<T: <Trait> + <Trait> ...> Point<T> {
+        // special methods for T has those traits.
+    }
+the trait-special methods can only be called for the generic type that has the
+specified traits.
+
+Validating References with Lifetimes
+------------------------------------
+
+rustc has a borrow checker,it handles the validation of object's lifetimes for
+us,usually,we do not need to care about dangle references.
+    let r;  ----------------+
+    {                       |
+        let x = 5; -----+   |
+        r = &x;         |   |
+    }              <----+   |
+    println!("r is {r}"); <-+
+in the example,the lifetime of @x is shorter than the lifetime of @r,if @r
+borrows @x,borrow checker will compares their lifetime scopes,thus it will found
+@x is not live long enough as the @r,rustc will throw error.
+    
+rust provides lifetime annotation syntax,it 'do not' change references lifetime,
+rather describe the _relationships_ of the lifetimes of multiple references to
+each other without affecting the lifetimes.(generic lifetime parameter)
+    &i32        // reference to i32
+    &'a i32     // reference to i32 with an explicit lifetime
+    &'a mut i32 // mutable reference to i32 with an explicit lifetime
+
+    // &'<character> <refer-type>
+    //  |<-------->| => lifetime annotation
+we can use lifetime annotation in function's signature.
+    //      +--> generic lifetime parameter
+    //      |
+    fn func<'a>(x: &'a i32, y: &'a i32) -> &'a i32 {
+        ...
+    } // the return value will be valid as long as both parameters are valid.
+      // this function does not need to know exactly how long its parameters will
+      // live,only that some scope can be substituted for "'a" that will
+      // satisfy this signature.
+if we specify the explicit lifetime for the references,rustc may throw error.
+    fn func(x: &i32, y: &i32) -> &i32 {
+        if x > y {
+            x
+        } else {
+            y
+        }
+    } // rustc dont know which reference will be returnted at runtime,
+      // but it need to knows the lifetimes of parameters in order to
+      // invoke drop() at the appropriate time.
+when generic lifetime parameter is interpreted by rustc,it is consists to the
+scope that is equal to the smaller one.(the lifetimes of parameters can overlap)
+! if one of function's parameters is a reference,and itdoes not have any
+  relationship with the lifetime of others(include return value),it does
+  not need a generic lifetime parameter to associated with.
+      fn func<'a>(x: &'a i32, y: i32) -> &'a i32 {
+          x
+      } // @y unused.
+
+we can use generic lifetime parameter in a structure definition for the member
+of that structure is a reference.
+    struct Ref<'a> {
+        r: &'a i32,
+    } // this annotation means an instance of Ref can not outlive the reference
+      // it holds in its @r member.
+and we can also use generic lifetime parameter for methods.
+    impl<'a> Ref<'a> {
+        fn get(&self) -> &i32 {
+            self.r
+        }
+    }
+
+lifetimes on function or method parameters are called "input lifetimes",and 
+lifetimes on return values are called "output lifetimes".
+
+lifetime elision rules >
+    1> compiler assigns a lifetime parameter to each parameter that is a
+       reference.
+    2> if there is exactly one input lifetime parameter,that lifetime is
+       assigned to all output lifetime parameters.
+    3> if there are multiple input lifetime parameters,but one of them is
+       "&self" or "&mut self" because this is a method,the lifetime of "self"
+       is assigned to all output lifetime parameters.
+
+    these rules only be considered by compiler.
+        
+there is a special lifetime annotation,it is "'static",it denotes that the
+affected reference can live for the entire duration of the program.
+    let str_ref: &'static str = "static str";
+
+we can combine generic lifetime parameter and generic type,in both structure
+definition and function definition.
+    struct Ref<'a, T> {
+        r: &'a T,
+    }
+    impl<'a, T> Ref<'a, T> {
+        fn get(&self) -> &T {
+            self.r
+        } // rule3
+    }
+
+    fn func<'a, T>(ref: &'a T) -> &'a T
+    where
+        T: <Trait>,
+    {
+        ...
+    }
+when we need to explicitly specify the concrete type for generic type to a
+structure at declaring,we can omit "'a".
+    let x = 10;
+    let x_ref = Ref::<i32> {
+        r: &x,
+    };
+
+    /* implicit type specify,auto deduced.
+     *
+     * let x_ref = Ref {
+     *     r: &x,
+     * };
+     *
+     */
+
