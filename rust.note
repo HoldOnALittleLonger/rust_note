@@ -2128,3 +2128,57 @@ structure at declaring,we can omit "'a".
      *
      */
 
+Automated Tests :
+^^^^^^^^^^^^^^^
+
+the BUGs of a program should be always considered,for detect them,we often need
+to write some program to test our main program.rust provides some macros and
+Cargo features to simplify this action.
+
+attribute #[test]
+    this attribute can be applied onto a rust function,for the functions have
+    this attribute,"cargo test" will automatically builds a test program to runs
+    the annotated functions,and reports the result.
+    when we create a library project through Cargo,the example for how to define
+    test function is automatically produced in "lib.rs".
+
+rust provides a macro function assert_eq!(@value, @expect),this macro does assert
+that @value is equal to @expect,otherwise,it will invoke panic!() and print the
+reason.
+another macro is assert!(@v),it similar to assert_eq!(),but it expect @v is true.
+if @v is false,panic!() will be called.
+! operator '!' means "NOT",can be used with boolean value.
+macro assert_ne!(@v, @dont_expect),does assert @v is not equal to @dont_expect.
+
+each of these macros can has a custom error message,as the last parameter of this
+macro function.if failed to pass the test,this message will be printed,too.
+    assert!(false, "error message");
+the message can be a format string,same as the format string in println!(),thus,
+we can pass additional arguments after that format string to replace the
+placeholder "{}".
+    assert!(false, "error {}", err_msg);
+
+attribute #[should_panic]
+    the function has "should panic" applied to,it will pass the test if it exactly
+    panicked.
+    we can add the optional "expected" parameter to the "should panic" attribute,
+    to describe what is the case we should panic.
+        #[should_panic(expected = "the case we expected to panic")]
+    if the function who invoked panic!() with a error message contains the
+    error message we expected in "should panic",the test will pass.
+
+the rust Result<> generic type can also be used for program test,if Ok is returned,
+the test is passed,otherwise,the test is not passed.
+    #[test]
+    fn test_it() -> Result<(), String> {
+        ...
+        if good {
+            Ok(())
+        } else {
+            Err(String::from("Test failed."))
+        }
+    }
+! in rust,for a generic type,we usually use '()' to represents void type that
+  in C and C++.
+
+
