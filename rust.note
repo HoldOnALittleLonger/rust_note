@@ -1205,12 +1205,15 @@ a private module by default.
     pub mod new_module; // public
 "mod" keyword tell rustc to include the code of that module into current file,
 "pub" means the module is global visible.
+// include means,the module exists and is part of this crate.
 
 rustc's work >
     start from the crate root
         main.rs
     declaring modules
-        checks whether the crate root has declaring modules.
+        // mod <module-name>;
+
+        checks whether the "crate root" has declaring modules.
         lookup module's code in
             in main.rs
             src/<module-name>.rs
@@ -1393,16 +1396,17 @@ similar to C++,when we have several modules in our rust program,we can separate
 them into different files.
 ! in C++,we separate namespace definitions into different files.
 keyword "mod" can be used to declare a module at current scope.
+// but private module can not be declared by other crate through "mod".
 because rustc lookup the module from the file has the same module name,thus,
 usually one source file can only has one main module.
     // module_x.rs
-    pub mod module_x {
+    pub mod module_y {
         pub fn func() { }
     }
 
     // lib.rs
     mod module_x;
-    pub use crate::module_x::func;
+    pub use crate::module_x::module_y::func;
 ! if we separate modules into different files,the file can also be a private module implicitly.
       // module_x.rs
       pub fn func() { }
@@ -2180,5 +2184,47 @@ the test is passed,otherwise,the test is not passed.
     }
 ! in rust,for a generic type,we usually use '()' to represents void type that
   in C and C++.
+! by default,cargo test runs the test function in parallel mode,but we can pass it
+  command line parameter "--jobs 1" to let it runs the functions consecutively,
+  this is useful if the test functions depend on each other.
+! by default,if a function passed test,its output would be captured by test library,
+  thus its print message would not display,if it failed to pass the test,the rust
+  test library would not capture its output.
+  command line parameter "--show-output" can prevent the library capture output.
+! we can specify the full function's name to execute single test,or specify the
+  common part of functions' names to execute subset test.
 
+attribute #[ignore]
+    function has this attribute will be skipped in normal test,this is useful to
+    exclude the time-consuming functions.
+    if we want to test the ignored functions only,we can pass command line
+    parameter "--ignored" to cargo test.
 
+Unit Tests
+----------
+
+the convention is to create a module named "tests" in each source file to contain
+the test functions,and to annotate the module with "#[cfg(test)]".
+
+attribute #[cfg(test)]
+    cfg -- configuration,tell rust the following item should only be included 
+    given a certain configuration option.
+    so we use this attribute on test module to tell rust to compile the code
+    of the annotated module only when cargo test is executed.
+
+Integration Tests
+-----------------
+
+the convention is to create a directory named "tests" under the project root.
+in which directory,we can create some test file.(no number limitation)
+in the test file,we should define some functions annotated "#[test]",and let them
+call to the library APIs.when we execute "cargo test",rust will looks into the
+directory to find test files,and for each of them,compile it to an individual
+crate,next runs the binary crate to see if the test is OK.
+
+! command line parameter "--test" can be used with a specified test file to tell
+  cargo test all functions in that file.
+  of course,function name for certain integeration function test is available.
+! if there is some helpers will be called from multiple test files,we should put
+  them into the "tests/common/mod.rs",instead to create "tests/common.rs" file.
+  (this can prevent cargo treats "common.rs" as an individual crate)

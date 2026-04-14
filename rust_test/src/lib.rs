@@ -12,6 +12,27 @@ pub fn will_panic() {
     panic!("just panic");
 }
 
+pub mod APIs {
+    pub fn unsigned_add(a: u64, b: u64) -> u64 {
+        a + b
+    }
+
+    pub fn unsigned_sub(a: u64, b: u64) -> u64 {
+        a - b
+    }
+
+    pub fn unsigned_mul(a: u64, b: u64) -> u64 {
+        a * b
+    }
+
+    pub fn unsigned_div(a: u64, b: u64) -> u64 {
+        if b == 0 {
+            panic!("division is _zero_");
+        } else {
+            a / b
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
