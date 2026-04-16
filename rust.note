@@ -2182,8 +2182,10 @@ the test is passed,otherwise,the test is not passed.
             Err(String::from("Test failed."))
         }
     }
-! in rust,for a generic type,we usually use '()' to represents void type that
-  in C and C++.
+! in rust,'()' is unit type,and we usually use it in the function's return value,
+  wrap it into Result::Ok().
+  for such function,this means we just need the function's side-effect only.
+  // similar to the void type in C and C++.
 ! by default,cargo test runs the test function in parallel mode,but we can pass it
   command line parameter "--jobs 1" to let it runs the functions consecutively,
   this is useful if the test functions depend on each other.
@@ -2228,3 +2230,86 @@ crate,next runs the binary crate to see if the test is OK.
 ! if there is some helpers will be called from multiple test files,we should put
   them into the "tests/common/mod.rs",instead to create "tests/common.rs" file.
   (this can prevent cargo treats "common.rs" as an individual crate)
+
+
+Some Useful Rust Stuff :
+^^^^^^^^^^^^^^^^^^^^^^
+
+Command Line Arguments
+----------------------
+
+a rust program can receives some command line parameter passed by user,or read
+some environment variables.
+the rust standard library provides "env" module,in which some argument related
+functions are exist.
+
+std::env::args()
+    this function can return an iterator points to the packaged command line
+    arguments,it is the special type Args.
+    we can invoke the method collect() on the Args object,convert arguments into
+    a collection.
+        // we annotate Vec<String>,to tell rust convert them to
+        // a vector of strings.
+        let args: Vec<String> = std::env::args().collect();
+    ! the first argument has index _zero_ is the program's name.
+
+another function can do this is named args_os(),its behaviour depends on OS,and
+it should only be used for the case that arguments contain invalid Unicode.
+
+String object
+-------------
+
+String object does support to a lot of useful methods.
+
+std::string::String::lines()
+    convert context in the String object to 'newline' character separated
+    substrings.
+
+std::string::String::contains(@pattern)
+    check whether this String contains @pattern in its context.
+    return true or false.
+    @pattern could be another String object,or slice type object.
+
+File I/O
+--------
+
+the standard library provides module named "fs",it contains some filesystem
+related stuff.
+
+std::fs::read_to_string(@file_name)
+    this function will open the file represented by @file_name,and read its
+    contents into a String object.
+    if succeed,return a Result<String> object.
+    ! this function will saves the file's contents into a single String object.
+
+exit() function
+---------------
+
+in rust,we usually do not explicitly invoke exit() or use return statement in the
+main() function.
+but sometimes,we might want to call exit() instead call to panic!() for the 
+special case that program runs wrong.
+
+std::process::exit(@exit_code)
+    the @exit_code is type of i32.
+    this function similar to the exit() function in C and C++.
+
+TDD,Test-Driven Development
+---------------------------
+
+the test driven development process,is we build the core functionalities after
+we have built the test module for those coming functionalities.
+
+the process is >
+    1> make test crate,it will fails,and it must fails for the reason we
+       expect.
+    2> make core crate for the test crate,and let the test pass.
+    3> refactor core crate,and ensure the test continue to pass.
+    4> repeat from 1>.
+
+unimplemented!() macro
+----------------------
+
+this macro can be used as a placeholder for where the corresponding functionality
+has not implemented.
+it will let program panics with the message "not implemented".
