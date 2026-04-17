@@ -1155,6 +1155,11 @@ The "match" Control Flow Construct >
     "if let" syntax can let us combine "if" and "let" to handle values that match
     one pattern while ignore the rest.
         let e = Enum::ENUM(String::from("if let"));
+
+        //     |<-------------->| => order between them can not be swapped.
+        //     |                |    local variable must after
+        //     |                |    "let" keyword's operand.
+        //     V                V
         if let Enum::ENUM(s) =  e {
             // @s is bound to the String object.
         }
@@ -1430,8 +1435,14 @@ usually one source file can only has one main module.
       // src/main.rs
       mod module_x;
       use crate::module_x::module_y::func;
-!! IF WE WANT A PACKAGE TO CONTAINS BOTH BINRAY CRATE AND LIBRARY CRATE,WE NEED TO
-   ADJUST THE FILE "Cargo.toml".
+
+! usually,a project may has its own library functions need by itself.
+  we should separate these functions into different module,and bring them
+  into the library file "lib.rs".
+  we can refer to these APIs in a binary crate through the "use" keyword.
+      use <project-name>::<component-name>;
+  where @project-name corresponds to the library crate "lib.rs",we refer
+  to library through project's name.
 
 Common Collections :
 ^^^^^^^^^^^^^^^^^^
@@ -2232,6 +2243,9 @@ crate,next runs the binary crate to see if the test is OK.
   (this can prevent cargo treats "common.rs" as an individual crate)
 
 
+
+/************************** Additional *****************************************/
+
 Some Useful Rust Stuff :
 ^^^^^^^^^^^^^^^^^^^^^^
 
@@ -2256,19 +2270,33 @@ std::env::args()
 another function can do this is named args_os(),its behaviour depends on OS,and
 it should only be used for the case that arguments contain invalid Unicode.
 
+std::env::var(@env-name)
+    this function is used to check whether the environment variable has the name
+    @env-name is set.
+    it will return a Result object,in which,the value of that environment variable
+    is wrapped into Ok().
+    ! we can invoke is_ok() method of the Result object to get a boolean value
+      to check whether result is Ok or Err.
+
 String object
 -------------
 
 String object does support to a lot of useful methods.
 
 std::string::String::lines()
-    convert context in the String object to 'newline' character separated
-    substrings.
+    member method to convert context in the String object to 'newline' character
+    separated substrings.
 
 std::string::String::contains(@pattern)
-    check whether this String contains @pattern in its context.
+    member method to check whether this String contains @pattern in its context.
     return true or false.
     @pattern could be another String object,or slice type object.
+
+std::string::String::to_lowercase()
+    member method to convert the context in this String object to lowercase
+    characters.
+
+! usually,the member methods of String object can also works on a slice object.
 
 File I/O
 --------
@@ -2281,6 +2309,19 @@ std::fs::read_to_string(@file_name)
     contents into a String object.
     if succeed,return a Result<String> object.
     ! this function will saves the file's contents into a single String object.
+
+Standard Error
+--------------
+
+generally,we print the message to the standard output stream,but sometimes,we
+need to print error message to the stream different from stdout,the stderr.
+for example,a program's output maybe redirected through shell operator '>' to
+a file,but we need to ensure the error message is not contained in that file,
+thus,we need to print error message to stderr instead print it to stdout.
+
+eprintln!(@formatting-string, ...)
+    different from println!(),the function eprintln!() will print the message
+    to stderr.
 
 exit() function
 ---------------
