@@ -2242,6 +2242,169 @@ crate,next runs the binary crate to see if the test is OK.
   them into the "tests/common/mod.rs",instead to create "tests/common.rs" file.
   (this can prevent cargo treats "common.rs" as an individual crate)
 
+Iterators and Closures :
+^^^^^^^^^^^^^^^^^^^^^^
+
+Closures
+--------
+
+rust closures are anonymous functions,can be saved in a variable,or passed as
+arguments to other functions.
+
+the closure expression in rust
+    <optional move> | <parameters> | <statement> 
+where @parameters represents the parameters this closure can receives,and the
+@statement can be a single statement,or a compound statement.
+
+in the statement,we can refer to local variable of current context,and
+in which,we can "move a captured value out of the closure","mutate the
+captured value","neither move nor mutate the value,or capture nothing
+from the local context".
+
+how the local variable is accessed in the closure,is deduced by compiler.
+if we only print(read only) the parameter,immutable borrow is OK.
+    || println!("{val}")
+if we need to modify the captured local variable in closure,must be mutable
+borrow.
+    || int_vec.push(2)
+if the local variable should be moved into the closure -- the local context
+give up to the lifetime maintenance,the closure should take care of this,then
+move semantics will satisfy.in this case,we need specify the keyword "move"
+before the closure definition.
+    // this usually happens in multi-thread program.
+    move || ptp.run()
+
+for Option type,its unwrap_or_else() expects a closure that takes none of 
+arguments.
+    || { ... }
+and for Result type,its unwrap_or_else() expects a closure that takes only one
+argument.
+    |ec| { ... } // @ec will be bound to the inner of Err of Result.
+
+rust closure is similar to the lambda expression in C++,but if we want the
+lambda expression returns a callable object,we need to allocate a new object.
+    int another_callable(void)
+    {
+      return 8;
+    }
+
+    auto callable = [](void) -> auto {
+      ...
+      return new std::function<int(void)>(another_callable);
+    };
+    auto another = callable();
+    auto ret = want_integer(another());
+    delete another;
+    // we must deallocate the callable object from callable() manually.
+
+in rust,we can declare a closure type object,similar to the lambda expression.
+    let lambda_expression = |int_ref: &i32| -> i32 {
+        2 * *int_ref
+    };
+
+    ! if we mutable borrow a local variable,and the closure is declared as
+      a variable,then this variable must be mutable.
+          let mut FnMut_Closure = || {
+              local_vec.push(...);
+          };  #^mutable borrow @local_vec
+
+    ! the checking processed by borrow checker on local captured variables,
+      happens at the time to define closure.
+      if we declare a variable bind to a closure,the checking will happens
+      at there.
+          let local_closure = || {
+              ...
+          };  #^borrow checking
+      if we have borrowed a local variable in immutable in a closure,then
+      another mutable borrow happened before the last use of this immutable
+      borrow will let compiler throws error.
+
+we can call to this closure object later,follow the syntax for function
+invocation.
+    let i = 2;
+    let j = lambda_expression(&i);
+if we omitted the type of parameter of a closure,the type will be implicitly
+deduced at the "first time" this closure is used.
+
+closure trait is how function and struct can specify what kinds of closure
+they can use.
+closure will automatically implement one,two or all three of "Fn" traits,in an
+additive fashion,depending on how the closure's body handles the values.
+    1> FnOnce trait
+           apply to closure that can be called once.
+    2> FnMut trait
+           apply to closure that do not move captured values out of their
+           body,but might mutate the captured values,can be called more 
+           than once.
+    3> Fn trait
+           apply to closure that do not move captured values out of their
+           body,and do not mutate captured values,as well as closure that
+           capture nothing from their environment.
+           can be called more than once without mutate environment.
+for example,unwrap_or_else() member method of Option<T>
+    pub fn unwrap_or_else<F>(self, f: F) -> T 
+    where
+        F: FnOnce() -> T
+        // @F is closure type,and the trait specified that,
+        // @f will be called once,takes no arguments,and need
+        // to return a value is type of T.
+    {
+        match self {
+            Some(x) => x,
+            None => f(),
+        }
+    }
+! if the action will be taken in None case do not refer/modify local context,
+  use the name of a function rather than a closure,because if it is a closure,
+  we need to implement a Fn trait.
+      let payload = none.unwrap_or_else(Vec::new());
+      // if @none is None,we get a new,empty vector.
+
+! some examples of closure trait.
+      let mut list = [
+          Rectangle { width: 10, height: 1},
+          Rectangle { width: 2, height: 5},
+          Rectangle { width: 11, height: 2},
+      ];
+
+      // sort @list by width.
+      // sort_by_key() specified FnMut trait.
+      // Fn trait for this closure,can be called more than once,
+      // thus meets the trait bound requirements.
+      list.sort_by_key(
+          |e| e.width
+      );
+
+      // move captured object out of environment.
+      let record_text = String::from("sort.");
+      let records: Vec<String> = Vec::new();
+
+      //                                (FnMut)
+      // BAD USAGE,failed to meet trait bound requirement.
+      // because this closure will moves the local variable
+      // @record_text out its body,move into @records.
+      // after we moved the String object,@record_text will
+      // be invalid.(move the value out of the closure by
+      // transferring ownership)
+      // this closure's trait is FnOnce.
+      list.sort_by_key(
+          |e| {
+              records.push(record_text);
+              e.width
+          }
+      );
+
+      // FnMut
+      let num_of_sort: u32 = 0;
+      list.sort_by_key(
+          |e| {
+              num_of_sort += 1;
+              e.width
+          }
+      );
+
+    
+
 
 
 /************************** Additional *****************************************/
@@ -2354,3 +2517,4 @@ unimplemented!() macro
 this macro can be used as a placeholder for where the corresponding functionality
 has not implemented.
 it will let program panics with the message "not implemented".
+
