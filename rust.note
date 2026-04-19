@@ -2403,6 +2403,73 @@ for example,unwrap_or_else() member method of Option<T>
           }
       );
 
+Iterators
+---------
+
+many rust structures support iterator,for create an iterator over the object,
+need to invoke member method,usually named iter().
+the for-cycel to iterate each item in a sequence,is implicitly used iterator.
+
+Iterator trait and the "next" method
+------------------------------------
+
+all iterators need to implement a trait named "Iterator",and that implementation
+must contains a method named "next".
+    pub trait Iterator {
+        // define an associated type with this trait.
+        type Item;
+
+        fn next(&mut self) -> Option<Self::Item>;
+    }
+call next() on an iterator will change its internal state,thus the variable is
+bound with an iterator must be mutable.
+    let mut vec_iterator = local_vec.iter();
+but there is an exception,when used an iterator in for-cycle,the cycle will
+takes the iterator's ownership,thus the variable do not need to be mutable.
+    let viter_for = local_vec.iter();
+    for e in viter_for {
+        ...
+    }
+iter() method need to return an iterator over immutable references.
+into_iter() method need to return an iterator that takes the ownership of
+elements in that container,and can be used to get the element itself.
+iter_mut() method need to return an iterator over mutable references.
+
+in the iterator trait,method invoke next() is called "consuming adapters",
+because next() method will changes the iterator's internal state,step to next
+element.(consuming adapter needs ownership of iterator)
+
+method sum() defined in Iterator trait,will takes the ownership of that iterator,
+and computes the sum from the sequence by invoke next() repeatedly.
+    let result = viter_for.sum();
+
+Other iterators
+---------------
+
+"Iterator adapters" are methods defined in Iterator trait,the method does not
+consume iterator,instead,they makeup different iterators by changing some aspect
+of the original iterator.
+
+the map() method in Iterator trait,require a closure,and invoke it on each
+element by iterate elements through the original iterator,then makeup a new
+iterator which can be used to iterate the mapped elements.
+    let mapped_iter = viter_for.map(|e| e * 2);
+
+note that,iterator in rust is lazy,that means,the result would not be created
+immediately,until we consume the iterator.
+if we want to consume the new iterator and get all results,we can invoke the
+collect() method in Iterator trait.
+    let mapped_results: Vec<_> = viter_for.map(|e| e * 2).collect();
+
+method filter() is defined in Iterator trait,it need a closure that returns
+a boolean value.if true is returned,current element would be included into
+this is making new iterator,otherwise,skip it.
+    let filtered_results: = viter_for.filter(|e| e % 2 == 0);
+
+! if an iterator is consumed,then the original becomes invalid.
+  (ownership have transferred)
+! many iterator adapter need a closure,we can let the closure captures the
+  variables in local context.
     
 
 
@@ -2411,6 +2478,14 @@ for example,unwrap_or_else() member method of Option<T>
 
 Some Useful Rust Stuff :
 ^^^^^^^^^^^^^^^^^^^^^^
+
+Determine what is the type of the result is
+-------------------------------------------
+
+a very useful method to determine the type of an object,is the compile error
+trick.
+    let _:() = <expression>;
+compiler will throws error and tell us what the type of result of @expression is.
 
 Command Line Arguments
 ----------------------

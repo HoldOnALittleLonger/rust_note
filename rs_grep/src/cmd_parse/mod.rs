@@ -23,6 +23,27 @@ pub fn cmdec2str(ec: &CMD_EC) -> &'static str {
 }
 
 pub fn parse_args() -> Result<(String, String), CMD_EC> {
+/*
+ * The following commented code used iterator feature o
+ * Rust.
+ * If we get the iterator returned by env::args() from
+ * main() function,the feature is useful.
+ */
+/*
+    let mut args_iter = env::args();
+    args_iter.next();
+
+    let Some(m) = args_iter.next() else {
+        return Err(CMD_EC::CMD_BADUSAGE);
+    };
+
+    let Some(f) = args_iter.next() else {
+        return Err(CMD_EC::CMD_BADUSAGE);
+    };
+
+    Ok((m.clone(), f.clone()))
+*/
+
     let cmd_args: Vec<String> = env::args().collect();
     if cmd_args.len() < 3 {
         return Err(CMD_EC::CMD_BADUSAGE);
