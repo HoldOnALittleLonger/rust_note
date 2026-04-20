@@ -2470,6 +2470,125 @@ this is making new iterator,otherwise,skip it.
   (ownership have transferred)
 ! many iterator adapter need a closure,we can let the closure captures the
   variables in local context.
+
+Smart Pointers :
+^^^^^^^^^^^^^^
+
+in rust,reference only borrow data,but in many cases,smart pointer own the
+data it pointed to,the smart pointer is provided by standard library.
+rust smart pointer defined "Deref" and "Drop" traits,the "Deref" trait allow
+the smart pointer to behave like a reference,and "Drop" trait allow user
+defined destructor.
+
+Box<T> smart pointer
+--------------------
+
+the Box<T> type smart pointer allow us to store data on heap rather than on
+stack,but the metadata of the pointer still stored on the stack.
+
+the cases Box<T> should be considered
+    1> the size of an object can not be determined at compile time.
+    2> there is a large amount of data,and we want to transfer ownership
+       but ensure no copying.
+    3> for user defined special type has particular trait.
+
+we can create a new Box smart pointer through its new() member method.
+    let sp = Box::new(@value);
+above statement will declare an immutable variable bind to a Box,and where
+@value is the value we want to stored on the heap.
+when @sp goes out of its scope,drop() method of this smart pointer will be
+called,the heap area would be clean.
+
+Enabling Recursive Types with Box
+---------------------------------
+
+"recursive type" can have another object of the same type as the part.
+because recursive type could theoretically continue infinitely,so rust can not
+know its total size.
+    enum ConsList<T> {
+        Cons(T, ConsList<T>),
+        Nil,
+    }
+
+    let cons_list: ConsList<i32> =
+        Cons(1, Cons(2, Nil));
+the above code would not compiled,rust will requires we use Box in the definition
+because "recursive without indirection",it can not knows the size of this type.
+    enum ConsList<T> {
+        Cons(T, Box<ConsList<T>>),
+        Nil,  //^rust been known size of Box object.
+    }
+
+    let cons_list: ConsList<i32> =
+        Cons(1, Box::new(Cons(2, Box::new(Nil))));
+
+Treating Smart Pointers Like Regular References
+-----------------------------------------------
+
+in C++,we can overload the dereference operator '*',to customize the behavior
+of this operator for user defined type.
+    value_type operator*();
+in rust,we can do the same thing through "Deref" trait.
+    // tuple struct.
+    struct CustomSP<T>(T);
+
+    impl<T> CustomSP<T> {
+        fn new(v: T) -> CustomSP<T> {
+            CustomSP(v)
+        }   
+    }
+
+    impl<T> Deref for CustomSP<T> {
+        // trait associated type.
+        // @Target is a member of Deref trait.
+        type Target = T;
+
+        // dereference method,the operator*().
+        // let it returns a reference,because
+        //     *(sp.deref())
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+Deref coercion converts a reference to a type that implements the "Deref" trait
+into a reference to another type.
+    &String => &str | because String implemented Deref trait.
+this is useful on arguments to a function or a member method,this Deref coercion
+happens automatically when pass a _reference_ to a particular type's value as an
+argument to a function or member method that does not match the parameter type.
+similar to C++ implicitly type conversion,but in C++,there at most only one
+user-defined convert function can be called,but rust no such limitation.
+
+! rust does deref coercion if 
+      1> &T => &U,T: Deref<Target = U>
+
+         have a &T,and T implements Deref for type U,
+         get &U instead &T.
+
+      2> &mut T => &mut U,T: DerefMut<Target = U>
+
+         mutable version.
+
+      3> &mut T => &U,T: Deref<Target = U>
+
+         rust coerce a mutable reference to an immutable one.
+         the reverse is not possible.(borrow rule)
+
+DerefMut trait
+--------------
+
+there is another "Defer" trait for mutable version.
+    impl DerefMut for <type> {
+        fn deref_mut(&mut self) -> &Self::<specified-type>;
+    }
+    
+    // immutable variable can not be borrowed as mutable.
+    let mut int_sp = CustomSP::new(10);
+    *int_sp = 20;
+note that,the "DerefMut" trait inherits "Target" from the "Deref" trait,thus
+we do not need to use additional type-definition to define a trait associated
+type.
     
 
 
