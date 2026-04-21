@@ -2559,7 +2559,7 @@ happens automatically when pass a _reference_ to a particular type's value as an
 argument to a function or member method that does not match the parameter type.
 similar to C++ implicitly type conversion,but in C++,there at most only one
 user-defined convert function can be called,but rust no such limitation.
-
+! need use "std::ops::Deref".
 ! rust does deref coercion if 
       1> &T => &U,T: Deref<Target = U>
 
@@ -2589,9 +2589,110 @@ there is another "Defer" trait for mutable version.
 note that,the "DerefMut" trait inherits "Target" from the "Deref" trait,thus
 we do not need to use additional type-definition to define a trait associated
 type.
-    
+! need use "std::ops::DerefMut".
 
+Cleanup with Drop trait
+-----------------------
 
+the Drop trait can let us to define customized destructor for object.
+for a smart pointer,destructor need to deallocate the heap space,thus
+this trait is very important to heap based objects to avoid memory
+leak.
+Drop trait requires one member method named "drop",it takes a mutable "self"
+reference.
+    impl<T> Drop for <type> {
+        fn drop(&mut self) { }
+    }
+! Drop trait is included in prelude,same as Option<> and Result<>.
+! if we want to drop object early before it goes out scope,we need invoke
+  the standard library function std::mem::drop() to do this,not the drop()
+  in Drop trait.
+  function std::mem:drop() also is included in prelude.    
+  # std::mem::drop() takes ownership of the object.
+
+Reference-Counted Smart Pointer
+-------------------------------
+
+the rust type Rc<T> allows share ownership between several entities.
+Rc<T> is only for use in single-threaded scenario.
+    let cons_list_1 = Rc::new(Cons(1, Rc::new(Cons(2, Rc::new(Nil)))));
+    let cons_list_2 = Cons(0, Rc::clone(&cons_list_1));
+    let cons_list_3 = Cons(-1, Rc::clone(&cons_list_2));
+the member method Rc::clone() can copy an object is type of Rc<T>,shallow copying
+only.
+    cons_list_2:
+        (0, => --+
+                 |    
+                 V
+    cons_list_1: Rc<>(1, => Rc<>(2, => Rc<>(Nil
+                 ^
+    cons_list_3: |
+        (-1, => -+
+Rc<> is included in the namespace std::rc::Rc,we need to bring it into local
+namespace.
+member method strong_count(@rc) of Rc<> can retrieve the reference count of the
+Rc<> smart pointer.
+    Rc::strong_count(&rc);
+! Rc<> is immutable,we can not use it to modify the value of oject it points to.
+! Rc<> will be destroyed only when its strong count becomes _zero_,regardless to
+  what weak count is.
+
+RefCell<T>,Interior Mutability
+------------------------------
+
+interior mutability is a design pattern in rust to allows us to modify an object
+through immutable reference.
+normally,the borrow rule forbit this pattern,but we can enforce modification
+through the "unsafe" pattern.
+"unsafe" means user checks borrow rules manually,do not rely on compiler to check
+them.
+
+rust type RefCell<T> are used to enforce borrow rules' invariants at runtime.
+RefCell<> can only be used in single-threaded scenario,and it can not share the
+ownership between several entities.but different from Rc<T>,RefCell<T> supports
+to immutable or mutable borrow checked at runtime,where Rc<T> is checked at 
+compile time.because this ability,we can mutate the object inside the RefCell<>
+even when the RefCell<> is immutable at runtime.
+
+member method borrow_mut() of RefCell<> can be used to makeup a mutable reference
+to that object the RefCell<> is pointing.
+! return RefMut<_, T> type,has DerefMut trait.
+
+member method borrow() of RefCell<> can be used to makeup an immutable reference
+to that object the RefCell<> is pointing.
+! return Ref<_, T> type,has Deref trait only.
+
+we can let Rc<T> object to holds a RefCell<T> object,and in which the real object
+is stored.then we can share ownership via the Rc<>,and we can use the immutable
+Rc<> to modify the real object at runtime.
+    let share_ownership: Rc<RefCell<i32>> = Rc::new(RefCell::new(20));
+    let mut modifier1 = (*share_ownership).borrow_mut();
+                      // *share_ownership.borrow_mut()
+                      // access to the real object directly.
+    *modifier1 = 30;
+! the borrow rules will be checked at runtime on RefCell<>,thus if we borrow
+  the object more than once,program will panic.
+
+!! reference cycle can leak memory.
+   in C++,when use std::shared_ptr<>,reference cycle may occurs,
+   but std::weak_ptr<> can prevent this.
+   in rust
+       enum ConsList {
+           Cons(i32, RefCell<Rc<ConsList>>),
+           Nil,
+       } // bring reference cycle problem.
+   and there also has type Weak<T>,can be used to prevent this problem.
+   the member method downgrade(&rc) of Rc<> can be used to makeup an object
+   it type of weak<>,and the Rc<> object's weak count will be increased by 1.
+   weak<> do not share ownership,if we want to use a weak<> object,we need to
+   invoke member method upgrade(&self) on it,this method returns Option<Rc<T>>.
+   if the original Rc<> been cleanup,then None will be contained in the Option.
+       let cons_list = Cons(1, RefCell::new(Rc::new(Nil)));
+       let weak_ref = Rc::downgrade(cdr(&cons_list).borrow());
+       // suppose cdr() returns reference to next element in Cons.
+       
+       let rc_ref = weak_ref.upgrade(); // Option<>.
+   
 
 /************************** Additional *****************************************/
 

@@ -23,6 +23,12 @@ impl<T> DerefMut for CustomSP<T> {
     }
 }
 
+impl<T> Drop for CustomSP<T> {
+    fn drop(&mut self) {
+        println!("CustomSP's drop() is called.");
+    }
+}
+
 fn print_str(s: &str) {
     println!("{s}");
 }
@@ -40,4 +46,12 @@ fn main() {
     println!("inner is {}", *int_pointer);
     *int_pointer = 20;
     println!("inner is {}", *int_pointer);
+
+    let str_pointer1 = CustomSP::new(String::from("drop"));
+    print_str(&str_pointer1);
+
+    let str_pointer2 = CustomSP::new(String::from("early drop"));
+    println!("do early drop.");
+    std::mem::drop(str_pointer2);
+    println!("did early drop.");
 }
