@@ -2692,7 +2692,122 @@ Rc<> to modify the real object at runtime.
        // suppose cdr() returns reference to next element in Cons.
        
        let rc_ref = weak_ref.upgrade(); // Option<>.
-   
+
+Concurrency in Rust :
+^^^^^^^^^^^^^^^^^^^
+
+concurrent execution in rust depends on borrow checking and type system,to change
+the runtime error of multi-threaded to the compile time error.
+
+create a new thread
+-------------------
+
+"thread" module in standard library provides interfaces for multi-threaded
+environment.
+function std::thread::spawn(@closure) can be used to create a new thread from
+current thread.
+    std::thread::spawn(
+        || { ... }
+    );
+when the main thread completed,all spawned threads are shutdown,except we detach
+them from main thread.
+function std::thread::sleep(@duration) can be used to let current thread sleep
+a while.
+    std::thread::sleep(std::time::Duration::from_millis(100));
+                      //^ rust time duration,will sleep 100ms.
+    
+the return type of spawn() function is JoinHandle<T>,we can store them somewhere
+when we spawn the new thread,and use the handle to wait for it finish in the
+main thread.
+    let handle = std::thread::spawn(|| { ... });
+    ...
+    handle.join().unwrap();
+the member method join() of JoinHandle<T> will returns a Result object,then we
+can know whether the new thread is joined successfully.
+
+if our main thread is a producer,and new thread is consumer,when we spawn a 
+new thread,we should use "move" keyword on the closure to transfer the ownership
+of specified object to the new thread's context,because main thread may give up
+to the maintenance of that object for some reason.
+    let vec_for_thread: Vec<i32> = vec![1, 2, 3];
+    let new_thread_handle = thread::spawn(
+        move || {
+            ... // used @vec_for_thread.
+        }
+    );
+    ...
+    new_thread_handle.join().unwrap();
+through transfer ownership,the main thread is no longer need to invoke the
+std::mem::drop() to destroy that resource used by new thread.   
+
+Thread communicate via rust channel
+-----------------------------------
+
+rust provides channel type to let upstream send message to downstream,that is
+included in the std::sync::mpsc module,function mpsc::channel() can be used to
+create such channel.
+! mpsc => Multiple Producer,Single Consumer
+
+             // upstream
+             B    C    D    ...
+              \   |   /    
+               \  |  /
+                \ | /
+                  +
+                  |
+                  |
+                  V
+                  A
+             // downstream
+
+mpsc::channel() returns a tuple,the first element is transmitter(tx),and the
+second element is the receiver(rx).
+    let (tx, rx) = mpsc::channel();
+    let new_thread_handle = thread::spawn(
+        move || {
+            tx.send(@val).unwrap();
+        }
+    );
+    ...
+    let v = rx.recv().unwrap();
+    ...
+    new_thread_handle.join().unwrap();
+member function send() of tx need a message that will be sent to downstream,
+and return a Result object. // send() takes ownership.
+member function recv() of rx can be used to receive the message from upstream,
+and return a Result object. // recv() gets ownership.
+! recv() may block current thread,another member function try_recv() would not
+  block current thread,and it also return Result<T, E>.
+  if upstream has shutdown the stream,then recv() of rx would return an error
+  to signal that no more messages will be coming.
+
+we can transfer ownership of an object via channel.
+    let to_be_sent = ...;
+    ...
+    move || {
+        tx.send(to_be_sent).unwrap();
+    }
+    ...
+    let received_obj = rx.recv().unwrap();
+    // assert(@received_obj == @to_be_sent).
+
+if we send several messages from upstream through send() method,then each send
+request will be queued in the order of send() is called,and recv() on rx will
+get the messages in a right order by call recv() several times.
+
+if we want to create several producer,then we need to clone tx for each upstream
+thread.
+    let (tx, rx) = mpsc::channel();
+    let tx1 = tx.clone();
+    let tx2 = tx.clone();
+    ...
+in this case,the upstream threads may executes concurrent,thus the messages from
+produces may mixed.
+    sender1: one, two, three
+    sender2: four, five, six
+    receiver: one, two, four, five, three, six
+    // because system interrupt.
+if we want the messages follow a certain order,we need to sync them manually.
 
 /************************** Additional *****************************************/
 
