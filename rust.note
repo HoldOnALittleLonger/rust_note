@@ -23,9 +23,9 @@ command "build" of cargo
     ask cargo build the project,this will produces a lot of files needed by the
     project,moreover,it will produces an binary executable file of debug version
     of this project.the built files are placed under the subdirectory "target".
-    // in default,cargo will build debug version of executable.with the parameter
-    // "--release",it will build release version of executable,that means no
-    // debug information is contained.
+    in default,cargo will build debug version of executable.with the parameter
+    "--release",it will build release version of executable,that means no
+    debug information is contained.
 command "run" of cargo
     ask cargo build and run the binary executable file of this project.
 command "check" of cargo
@@ -2808,6 +2808,94 @@ produces may mixed.
     receiver: one, two, four, five, three, six
     // because system interrupt.
 if we want the messages follow a certain order,we need to sync them manually.
+
+Use Mutex to sync threads in rust
+---------------------------------
+
+Mutex,the mutual exclusion,at any time,only one entity is allowed accesses to
+the special shared object.
+rust provides mutex data structure,the Mutex<T>,is inclued in std::sync::Mutex.
+constructor new(@shared_object) method of Mutex<> can be used to create and
+initialize a mutex object.
+    let lm: Mutex<i32> = Mutex::new(20);
+new() needs to take ownership of @shared_object,if we pass a value to it rather
+than a been created object,it need to create such object at internal space.
+different from C and C++ mutex,it stores the shared object in its internal space,
+but C and C++ mutex only is a lock.
+
+member method lock() of Mutex<> returns LockResult type,which will wraps an
+object is type of MutexGuard,we can call to unwrap() method on that result
+to retrieve the wrapped object.
+the MutexGuard type has implemented Deref DerefMut Drop trait,thus we can access
+to the guarding data like a SmartPointer.
+    println!("shared object is {}", *lm.lock().unwrap());
+when the MutexGuard object goes out of its scope,automatically Drop will happens,
+thus the mutex will become unlock state.(similar to C++ std::lock_guard<>)
+
+there is another problem,if we want to access the mutex in the spawned thread,
+the closure of the thread need to capture the mutex.
+if we let the thread capture the mutex by reference,the mutex's livetime is
+maintained by current thread,if current thread finished,the mutex object will
+be destroyed,this is an error if the new thread access to the mutex.
+so we need capture it by take ownership,but current thread is not able to
+access to the mutex at this time.
+we must ensure the current thread and the new thread share ownership of the
+mutex object.
+
+we can not use Rc<>,because it is only for single-thread.
+rust provides another data structure named Arc<T> can be used to solve this
+problem.(Arc<T> => Atomic Reference Count)
+Arc<T> is inclued in module std::sync:atomic,it is the atomic version of
+Rc<T>.
+    let arc: Arc<Mutex<i32>> = Arc::new(Mutex::new(20));
+    let arc_for_thread = Arc::clone(&arc);
+    let t1 = thread::spawn(
+        move || {
+            ... // capture @arc_for_thread by take ownership.
+        }
+    );
+the member method Arc::clone(&@Arc_object) can help us to make a clone of the
+original Arc<> object,we can move the clone into new thread.the mutex wrapped
+in the Arc<> object as long as valid until the strong count become _zero_.
+
+Send and Sync traits
+--------------------
+
+the key concurrency concepts are embedded in the rust language,not in the
+standard library,they are std::marker traits,Send and Sync.
+
+Send marker trait,the ownership of objects of the type implemented Send trait
+can be transferred between threads.
+almost every rust type implemented Send trait.
+! Rc<> is used for single-thread only,because no Send trait is implemented for
+  it.
+  if we clone a new Rc<>,the strong count of them would be updated at the same
+  time.
+      Rc1 [ ... | strong count ]
+                  ^  
+                  |
+                  +-----+
+                        |
+                        V
+      Rc2 clone [ ... | strong count ]
+
+  Arc<> implemented Send trait,thus it can be used for multi-threads.
+
+Sync marker trait,refer to the type implementing Sync trait between multiple
+threads is safe.
+T implements Sync if &T implements Send,reference can be sent safely to another
+thread.
+primitive types all implement Sync.
+! Rc<> does not implement Sync trait.
+  Mutex<> does implement Sync trait.
+  RefCell<> is borrow checked at runtime,thus it is not thread-safe.
+
+implement Send and Sync manually is unsafe.
+the types composed entirely of other types that implement the Send and Sync
+traits also automatically implement Send and Sync.
+marker traits,do not even have any methods to implement,just for
+enforce invariants related to concurrency.
+
 
 /************************** Additional *****************************************/
 
