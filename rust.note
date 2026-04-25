@@ -1758,7 +1758,7 @@ similar to C++ throw an exception.
 in rust,symbol '?' can be used as a shortcut for Result<> object.
     let f = File::open(s)?;
 if result is Ok,'?' is same as unwrap().
-if result is Err,'?' will conver E to the current function's return type,and
+if result is Err,'?' will convert E to the current function's return type,and
 return the converted object to caller.(early return)
 
 error values that have '?' operator called on them go through the 'from' function,
@@ -2895,6 +2895,86 @@ the types composed entirely of other types that implement the Send and Sync
 traits also automatically implement Send and Sync.
 marker traits,do not even have any methods to implement,just for
 enforce invariants related to concurrency.
+
+Rust Asynchronous Programming :
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Futures and the Async syntax
+----------------------------
+
+a future is a value that may not be ready now,but will become ready at some
+point in the future.(such C++ promise)
+rust has the "Future" trait,futures are types that implement the "Future" trait.
+
+the keyword "async" to blocks and functions to specify that they can be interrupted
+and resumed.
+in the "async" block,or in the "async" function,keyword "await" can be used to
+await a future.(potential spot for pause and resume)
+the checking to a future is called "polling".
+
+for code used async and await keywords,compiler will compiles them to equivalent
+code using the Future trait,same as for loop to Iterator trait.
+
+! in rust,"future" is laziness,we can seen the result when we ask the it with the
+  "await" keyword,the future related code will runs when it is necessary.
+! "await" is a postfix keyword,usually appears after the expression we want to
+  await.
+      let x = return_future().await;
+
+async function
+    async fn <function-name>(<parameter-list>) -> <return_type> {
+        <body>
+    }
+
+    // mark a function as an async function,
+    // then we can use "await" keyword on the
+    // function's result.
+    // rust compiler will help us to wrap the
+    // result into Future type.
+    async fn func() -> <return_type> {
+        ... // body.
+    }
+
+async block
+    async <optional move keyword> {
+        ...
+    }
+    ! keyword "move" has the same effect as in a closure definition,
+      means take ownership of the object captured in the block.
+
+
+    // non-async function from async function.
+
+                           // +--> trait associated type
+                           // |        +--> type we want return
+                           // |        |
+    fn func() -> impl Future<Output = <type-name>> {
+
+        // we return an async block from this function,it will be
+        // wrapped into a an object whose type has Future trait.
+        async move {
+            ...
+        } // block is a compound expression.
+          // this async block should produces
+          // a result is type of the real type we
+          // want return.
+
+    }   
+
+in rust,we can not await a future in main() function,because async code needs a
+"runtime",it is a rust crate manages the details of executing asynchronous code.
+main() funcion can initialize a runtime,but it is not a runtime itself.
+any rust program used async,need a runtime where to execute the futures.
+
+the await point--where used await keyword,represents a place where control is
+handed back to the runtime.(runtime use the state machine to handles async
+expressions have received,rustc can creates and manages the state machine data
+structures for async code automatically)
+
+! some runtime may provides select() function,it should able to polling futures
+  to return the first one became ready state,we can "await" on the future to
+  get the result.
+
 
 
 /************************** Additional *****************************************/
