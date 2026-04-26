@@ -2914,6 +2914,45 @@ the checking to a future is called "polling".
 
 for code used async and await keywords,compiler will compiles them to equivalent
 code using the Future trait,same as for loop to Iterator trait.
+the keyword "await" can only be used in "async" block or function,in other word,
+it can only be executed in asynchronous context.(main() is synchronous context)
+
+when runtime executing the async code,it will be blocked at the position where
+"await" is appears in the original code,because it is required to await a future.
+    let fut1 = async {
+        ...
+    };
+
+    let fut2 = async {
+        ...
+    };
+
+    futures::block_on(
+        async move {
+            ...
+            fut1.await; // runtime awaiting the future @fut1.
+            ...
+            fut2.await; // runtime awaiting the future @fut2.
+        }
+    );
+if we start an asynchronous context,the synchrnous contex in which this asynchrnous
+context is started will be blocked until the asynchrnous context finished.
+(we usualy call the synchronous context the "top-level")
+    fn main() {
+
+        // top-level
+
+        futures::block_on(
+            // asynchrnous context.
+
+            async {
+                ...
+            }
+        );
+
+        // main() will be blocked until futures::block_on() returns,
+        // because main() is synchrnous context.
+    }   
 
 ! in rust,"future" is laziness,we can seen the result when we ask the it with the
   "await" keyword,the future related code will runs when it is necessary.
@@ -2941,6 +2980,11 @@ async block
     }
     ! keyword "move" has the same effect as in a closure definition,
       means take ownership of the object captured in the block.
+    ! async block will produces an anonymous future.we can give the
+      anonymous future a variable binding to refer it.
+          let the_future = async {
+              ...
+          };
 
 
     // non-async function from async function.
@@ -2974,7 +3018,20 @@ structures for async code automatically)
 ! some runtime may provides select() function,it should able to polling futures
   to return the first one became ready state,we can "await" on the future to
   get the result.
-
+! the order "await" appears in code,is the order those code is executed by the
+  asynchronous runtime.if we put "await" keywords in one async block,then they
+  are executed linearly.
+      async {
+          ...           // first to be executed
+          xxx.await;    // 
+          ...           // second to be executed
+          yyy.await;    //  
+      }
+  similar to the memory barrier.
+  it we separate the await code into several individual async block,and pass 
+  those futures to runtime,they might be executed interactively,may be not,depends
+  on runtime.(for polling mode,this should be interactively)
+      A => B => A => B => ...
 
 
 /************************** Additional *****************************************/
@@ -3095,4 +3152,14 @@ unimplemented!() macro
 this macro can be used as a placeholder for where the corresponding functionality
 has not implemented.
 it will let program panics with the message "not implemented".
+
+while let loop
+-------------------
+
+the loop "while let" similar to "if let" statement,but this is for loop.
+    while let <pattern> = <match> {
+        ...
+    }
+
+we execute the loop,if we matched the pattern.
 
