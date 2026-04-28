@@ -1458,7 +1458,7 @@ collection Vec<T> >
     one type of element.rust vector is defined in module "std::Vec".
         let iv: Vec<i32> = Vec::new(); // empty collection with certain type.
 
-        let iv1 = Vec![1, 2, 3]; // type is auto deduced to i32,integer default.
+        let iv1 = vec![1, 2, 3]; // type is auto deduced to i32,integer default.
                 //^initilization
     member method push() can be used to update a vector object.
         iv.push(1);
@@ -2499,6 +2499,19 @@ above statement will declare an immutable variable bind to a Box,and where
 when @sp goes out of its scope,drop() method of this smart pointer will be
 called,the heap area would be clean.
 
+! Trait object
+    we can let generic type of smart pointer to be a trait,then we can use
+    the smart pointer points to object of any type that implemented the
+    specified trait.
+      let copy_box: Box<dyn Copy> = Box::new(...);
+      trait CustomTrait {
+
+      }
+
+      let custom_box: Box<dyn CustomTrait> = Box::new(...);
+    a little similar to C++ base class pointer to derived class object.
+    # keyword "dyn" is a prefix used to define a Trait object.
+
 Enabling Recursive Types with Box
 ---------------------------------
 
@@ -3023,9 +3036,9 @@ structures for async code automatically)
   are executed linearly.
       async {
           ...           // first to be executed
-          xxx.await;    // 
+          xxx.await;    // pause
           ...           // second to be executed
-          yyy.await;    //  
+          yyy.await;    // pause 
       }
   similar to the memory barrier.
   it we separate the await code into several individual async block,and pass 
@@ -3033,6 +3046,167 @@ structures for async code automatically)
   on runtime.(for polling mode,this should be interactively)
       A => B => A => B => ...
 
+the rust only pauses async blocks and hands control back to a runtime at an
+await point,the inverse is also true.(the future being awaited is not ready)
+if we put a long-running work or expensive setup into one async block without
+await point,then other futures would not get progress because runtime has not
+get control back.
+    let async1 = async {
+        ... // long-running
+        future.await;
+    };
+
+    let async2 = async {
+        ... // long-running
+        future.await;
+    };
+
+    // async2 gets running after async1
+    // did "future.await;".
+    // suppose select() handles futures in polling mode.
+    future::select(async1, async2).await;
+@async1 get running at first,when it reached await point,hands control back to
+the runtime,then runtime let @async2 get running.when @async2 reached await point,
+hands control back to runtime.runtime next let @async1 get running,but there is
+no rest statement can executes,so the first future finished.runtime let @async2
+get continue,but same as @async1,no more statement can executes,the second future
+finished.now,runtime get into idel state.
+through future,the workflow of different parts of a program become visible,we
+can know where the code paused,and when it get resumed.
+
+Stream,Future,and Iterator
+--------------------------
+
+a stream can be used to store the data will coming sequentially.
+for each timepoint,the data has come into the stream,we can think a promise in
+future has satisfied.
+                                         will come
+                                         |<----->|
+    |====================================-------->
+     |<----------- existing ----------->|
+
+because we do not know when is the future the data we expected get come into
+stream,thus,stream is asynchronous.
+if we want to access the data in a sequence,we usually make use of an iterator.
+but iterator is synchronous,so we need a way to combine asynchronous stream and
+synchronous iterator.
+
+we can let a stream provides an iterator,or we can use an iterator of a sequence
+to makeup a stream.
+    let seq: Vec<i32> = vec![0, 1, 2, 3, 4, 5];
+    let it = seq.iter(); 
+
+    // makeup stream from an iterator.
+    let stream = stream_from_iterator(it);
+    while let Some(d) = stream.next().awai {
+        ...
+    }
+
+    let file = open_file(@filepath);
+    let fstream = file.stream();
+    let fstream_it = fstream.iter();
+    while let Some(d) = fstream_it.next().await {
+
+    }
+for asynchronous stream,such network packages,file stream,we can let runtime
+suspends the handler until the data comes,and other part of code,we can
+continue to deal with another work.when we realy need the future's result,
+we can await to wait for stream returns result.
+so,at other view point,stream is seem like an asynchronous iterator.
+    pub trait Stream {
+        type Item;
+
+        fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>)
+        -> Poll<Option<Self::Item>>;
+    }
+
+    trait StreamExt: Stream {
+        async fn next(&mut self) -> Option<Self::Item>
+        where
+            Self: Unpin;
+    }   
+
+! usually Stream trait is the low-level stream,and StreamExt trait is the
+  high-level APIs over low-level stream.
+  
+
+A Closer Look at the Traits for Async
+-------------------------------------
+
+the Future trait usually has a method named "poll",and which will return a
+wrapper,which will wraps the result of poll.
+! Ready(T) => future ready
+  Pending  => is pending
+we usually do not need to invoke poll() method directly,compiler will does this
+for us if we used "await".the future,generally can only be polled by once,if we
+poll the future again,may cause panic.(maybe some futures supports more than once
+polls)
+    match return_a_future().poll() {
+        Ready(v) => match v {
+                        Some(d) => ... ,
+                        None => ... ,
+                    },
+        Pending => ... , // need to hand control to runtime,let it
+                         // checks other futures.
+    }
+
+the Pin Type and the Unpin Trait,usually comes with poll() method together.
+    pub trait Future {
+        type Output;
+        
+        fn poll(self: Pin<&mut Self>, cx: &mut Context<'->) -> Poll<Self::Output>;
+    }
+the "self" annotation has some different trait from annotation for other function
+parameters.
+    > it tells rust what type "self" must be for the method to be called.
+    > it can not be just any type,it is restricted to the type on which the
+      method is implemented,a reference or smart pointer to that type,or
+      a Pin wrapping a reference to that type.
+
+Pin Type,is a wrapper for pointer-like types,but it is not a pointer itself,
+and does not have any behavior of its own,it is purely a tool the compiler can
+use to enforce constraints on pointer usage.
+it pins the exact object,not the pointer,if we pinned an object,then it can not
+be moved in memory(the memory location can not changes).
+Box object can be moved around,but the object is pointed previously need to stay
+in the same place,Pin Type provides this guarantee.
+
+Unpin Trait is a marker trait,no functionality of its own.it only to tell compiler
+it is safe to use the type implementing a given trait in a particular context.
+for any type it is safe(no internal reference),compiler implements UnPin trait
+for this type automaticall.such type does not need to uphold the guarantees to be
+safe whenever a pointer to that type is used in a Pin Type.
+! Unpin is normal case,!Unpin is special case.
+  whether a type implements Unpin or !Unpin,only matters when we using a pinned
+  mutable pointer to that type. 
+! Unpin => self-referential
+
+a Future will be compiled to a state-machine by compiler at compile time,for
+safety,rustc must checks objects ownership and lifetime in the flow.if we want
+to move the Future type object produced by async block into collection,we need
+to Pin it because it has not implement Unpin(it has internal references).
+macro pin!(@obj) can be used to pin @obj,to keep its memory location unchanged.
+    let fut1 = pin!(async { ... });
+    let fut2 = pin!(async { ... });
+
+    let fvec: Vec<Pin<&mut dyn Future<Output = ()>>> = vec![fut1, fut2];
+
+! Pin Type is defined in module std::pin,we can bring them into current scope
+  through
+    use std::pin::{Pin, pin};    
+
+
+[sync operation and async operation both running on runtime]
+                                                 
+++>  ++++> async operation +++++++> await +++++++++++++++++ async end 
++                              |||                       +          -
++                               |                        +          -
++                              |||                       +          -
++    ----> sync operation ---> start async operation ----> ... ----->
++                                                    ^   +          -
++                                                    -   V          V
++++ [====================================================+==========-]
+                            rust runtime
 
 /************************** Additional *****************************************/
 
