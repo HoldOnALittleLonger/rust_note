@@ -1885,6 +1885,7 @@ but all of them,sharing the implementation for generic type.
   the monomorphization is the process of turning generic code
   into specific code by filling in the concrete types that are
   used when compiled.
+  # static dispatch.
 
 Defining Shared Behavior with Traits
 ------------------------------------
@@ -3207,6 +3208,146 @@ macro pin!(@obj) can be used to pin @obj,to keep its memory location unchanged.
 +                                                    -   V          V
 +++ [====================================================+==========-]
                             rust runtime
+
+Rust Object-Oriented Programming
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Object-Oriented programs are made up of objects.an object packages both data and
+the procedures that operate on the data,the procedures are typically called
+methods or operations.
+in rust for do this,we can use structure and implementation features.
+
+encapsulation,means that the implementation details of an object are not 
+accessible to code using that object,hides the details.the rust keyword "pub"
+can change the accessibility of an object,default it should be private.
+    pub struct Average {
+        sum: i32,
+        avg: i32,
+        count: i32,
+    }
+
+    impl Average {
+        fn add_number(&mut self, v: i32) {
+            self.sum += v;
+            self.count += 1;
+            self.avg = self.sum / self.count;
+        }
+
+        pub fn add(&mut self, v: i32) {
+            add_number(self, v);
+        }
+        
+        pub fn sub(&mut self, v: i32) {
+            add_number(self, v * -1);
+        }
+
+        pub fn avg(&self) -> i32 {
+            if self.count == 0 {
+                0
+            } else {
+                self.avg
+            }
+        }
+
+        pub fn reset(&mut self) {
+            self.sum = 0;
+            self.avg = 0;
+            self.count = 0;
+        }
+    }
+
+Inheritance as a Type System and as Code Sharing
+------------------------------------------------
+
+rust has no inheritance,if we want a struct inherits the parent struct's fields
+and methods,must use a macro.
+
+the reasons need to use inheritance
+    1> for code reuse.
+       for do this in rust,we can define the default implementation for a
+       trait,and define special implementation for a certain type.
+    2> for enable a child type to be used in the same places as the parent type,
+       the "polymorphism".
+       rust use generic type and trait bounds to enable "polymorphism",it is
+       "parametric polymorphism".
+
+Using Trait Objects to Abstract over Shared Behavior
+----------------------------------------------------
+
+if we want some types has a common behavior,then we should define a trait for
+them,and give the default implementation for that common behavior.
+    trait CustomCommon {
+        type RetType;
+        fn common(&mut self) -> Self::RetType;
+    }
+
+    impl CustomCommon for CustomStruct {
+        type RetType = CustomStructRetType;
+        fn common(&mut self) -> Self::RetType {
+            ...
+        }
+    }
+the keyword "dyn" used in a Box can let us to declare trait object,it can points
+to any type that implemented the specified trait.
+    // for the trait associated type,we need to specify it in
+    // the Box's generic type description.
+    let mut CustomStruct_collection: Vec<Box<dyn CustomCommon<RetType = @type>>>
+        = vec![Box::new(CustomStruct::new())];
+    CustomStruct_collection[0].common();
+if we specified the trait associated type in the detail,then we must ensure the
+Box's generic type description match it,the Box can only points to the
+object whose trait associated type is same as the type appears in generic type
+description.
+    Box<@Trait<@TraitAssociatedType = @type>> ...
+
+if an object should be composed by some other objects they have implemented the
+common trait,then we can collect them into a container.
+    pub trait CommonTrait {
+        fn method(&mut self);
+    }
+
+    struct CS { }
+    impl CS { ... }
+    impl CommonTrait for CS { ... }
+
+    struct CS1 { }
+    impl CS1 { ... }
+    impl CommonTrait for CS { ... }
+
+    struct CS2 { }
+    impl CS2 { ... }
+    impl CommonTrait for CS { ... }
+
+    struct CallMethod {
+        obj: Vec<Box<dyn CommonTrait>>,
+    }
+
+    impl CallMethod {
+        fn call(&mut self) {
+            for object in self.obj.iter() {
+                object.method();
+            }
+        }
+    }
+
+    let mut collection = CallMethod {
+        obj: vec![Box::new(CS::new()),
+                  Box::new(CS1::new()),
+                  Box::new(CS2::new())
+                 ],
+    };
+
+    collection.call();
+
+Dynamic Dispatch
+----------------
+
+when the compiler can not tell at compile time which method we are calling,
+compiler will emits code that at runtime will know which method to call.
+when we using trait object,dynamic dispatch will be used,rust uses the pointers
+inside the trait object to know which method to call.
+in C++,such pointers are collected into a virtual function table.
+! incur runtime cost.
 
 /************************** Additional *****************************************/
 
