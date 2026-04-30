@@ -1114,9 +1114,24 @@ The "match" Control Flow Construct >
         let x = Option<i32>::Some(10);
         match x {
             None => None,
-            Some(v) => Some(v + 1),
+            Some(v) => println!("x is {v}"),
         }
-    we let the inner increase by 1 if @x is not None.
+
+        fn return_option(x: Option<i32>) -> Option<i32> {
+            match x {
+                None => None,
+                Some(v) => Some(v + 2),
+            }
+        }   
+    ! for the type T in Some(T),if Copy trait has implemented,the match binding
+      will use copy instead move.
+      if we want to borrow the value whose type has no Copy trait implemented,we
+      can invoke as_ref() member method on the Option<> object,or use the "ref"
+      keyword in pattern matching.
+          match x {
+              None => ... ,
+              Some(ref v) => ... ,  // @v is a reference to the exact value.
+          }
 
     result of match-expression is the result of that matched arm's.
 
@@ -3099,7 +3114,7 @@ to makeup a stream.
 
     // makeup stream from an iterator.
     let stream = stream_from_iterator(it);
-    while let Some(d) = stream.next().awai {
+    while let Some(d) = stream.next().await {
         ...
     }
 
@@ -3348,6 +3363,136 @@ when we using trait object,dynamic dispatch will be used,rust uses the pointers
 inside the trait object to know which method to call.
 in C++,such pointers are collected into a virtual function table.
 ! incur runtime cost.
+
+Implementing an Object-Oriented Design Pattern
+----------------------------------------------
+
+in Object-Oriented design,we usually need a state pattern.
+the state represents current state of the object,and constraints its behaviors.
+the traditional state pattern is use a data member in that object to represents
+its state,the member methods of that object need to check its current state to
+determine whether current action is allowed.
+
+traditional state pattern
+    struct OBJ {
+        state: i32
+        ...
+    }
+
+    impl OBJ {
+        fn do_something(&self) {
+            match state {
+                @state1 => @action1,
+                ...
+            }
+        }
+
+        fn do_something1(&self) {
+            match state {
+                @state1 => @action1,
+                ...
+            }
+        }
+    }
+the traditional state pattern will bring repeated code into each member methods
+for check current state.
+
+encapsolute state object
+    struct OBJ {
+        state: Box<dyn StateTrait>,
+        ...
+    }
+
+    trait StateTrait {
+        fn do_something(obj: &OBJ);
+        ...
+    }
+
+    struct State1 { }
+    impl StateTrait for State1 { ... }
+
+    impl OBJ {
+        fn do_something(&self) {
+            if self.state == @State1 {
+                self.state.do_something(self);
+                ...
+            }
+            ...
+        }
+    }
+through encapsolute state object,we can make some wrappers in the object that
+uses the state object.and in the definition of state object,we put the real logic
+into its methods,and let those wrappers invoke the methods in state object,to
+handles real works.
+
+encode state object to type
+    struct OBJ {
+        ...
+    }
+
+    impl OBJ {
+        fn full_features(&self) { ... }
+        fn new() -> InitialOBJ { ... }
+    }
+
+    struct InitialOBJ {
+        ...
+    }
+
+    impl InitialOBJ {
+        fn become_progressing(self) -> ProgressingOBJ { ... }
+    }
+
+    struct ProgressingOBJ {
+        ...
+    }
+
+    impl ProgressingOBJ {
+        fn become_OBJ(self) -> OBJ { ... }
+    }
+through encode state object to different types,we can restrict what the actions
+can be taken on the object in a certain state.any calling to disallowed actions
+will get compiler error.
+
+for the type of state object,if we do not encode state to type,we should use
+Option<> instead use Enum.because,if we use Enum,then we need to put all possible
+patterns into match-expressions,this is a dirty work,and easy to make mistake.
+by use Option<Box<dyn @Trait>>,we just need to handle the Some(v) case,because
+we can design the state object to let it never becomes None.when the state object
+migrate state from old state to new state,we should let the code takes the
+ownership of the old state,to consume it for create a new state.
+    fn do_something(&mut self) {
+        if let Some(s) = self.state.take() {
+            self.state = s.do_something(self);
+            ...
+        }
+        ...
+    }
+
+    impl StateTrait for State {
+        fn do_something(self: Box<Self>) -> Box<dyn StateTrait> { ... }
+    }
+
+    /**
+     * the take() member method of Option<> can take ownership of the value
+     * in Some() rather than borrow it,we can move it and consume it.
+     * at there,it is a trait object Box<dyn StateTrait>.
+     * we can only invoke take() if and only if the Option<> object is mutable.
+     * after we take the ownership(),the Option<> object becomes None.
+     */
+
+    fn do_something1(&self) -> &InternalDataType {
+        self.state.as_ref().unwrap().do_something1(self)
+    }
+
+    impl StateTrait for State {
+        fn do_something1(&self, obj: OBJ) { ... }
+    }
+    /**
+     * if do_something1() do not change the state,we should borrow the value
+     * in Option<> rather than take ownership,thus we invoke as_ref() on it.
+     */
+
 
 /************************** Additional *****************************************/
 
