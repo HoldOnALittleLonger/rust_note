@@ -3493,6 +3493,247 @@ ownership of the old state,to consume it for create a new state.
      * in Option<> rather than take ownership,thus we invoke as_ref() on it.
      */
 
+Patterns and Matching :
+^^^^^^^^^^^^^^^^^^^^^
+
+All the Places Patterns Can Be Used
+-----------------------------------
+
+the first place is the match-expression,we have known that.
+
+we can also use pattern in the "let" statement,use this style can allow us to
+get the data members in a tuple(destructure a tuple).
+    let <pattern> = <expression>;
+    let (x, y, z) = (1, 2, 3);
+if the number of variabels in pattern is not matches to the expression,compiler
+will throw error.
+
+the "if let" flow control statement can use pattern.
+    if let Some(v) = x {
+        ...
+    }
+
+"while let" loop can use pattern.
+    while let Ok(v) = rx.recv() {
+        ...
+    }
+
+"for" loop can use pattern.
+    for (key, value) in &hashmap {
+        ...
+    }
+
+in function parameter list,pattern can be used.
+    fn func(&(x, y): &(i32, i32)) { ... }
+    let x = (10, 20);
+    func(&x);
+
+Refutability: Whether a Pattern Might Fail to Match
+---------------------------------------------------
+
+pattern has two forms,refutable and irrefutable.
+patterns will match for any possible value passed are irrefutable.
+patterns can fail to match for some possible value are refutable.
+    let x = 20; // irrefutable,@x only match 20
+    if let Ok(e) = r { ... } // refutable,@r might be Err
+
+    let Some(x) = option; // compile error,refutable pattern.
+
+"let","for",function parameters,can only accept irrefutable patterns.
+"if let","while let","let...else" can accept refutable and irrefutable patterns.
+
+Pattern Syntax
+--------------
+
+matching literals.
+    let obj = 10;
+    match obj {
+        1 => <action>,
+        2 => <action>,
+        ...
+        _ => <action>,
+    }
+
+the named variable in @pattern is irrefutable.
+    let obj = get_result();
+    match obj {
+        // start a new scope.
+
+        Some(v) => <action>,
+        Some(20) => <action>,
+        None => <action>,
+    }
+
+matching multiple patterns.
+    match @obj {
+        <patternA> | <patternB> => <action>,
+        ...
+    }
+
+matching ranges of values with "..=".
+    match @obj {
+        1..=6 => <action>
+        ...
+    }
+    // if @obj is in [1, 6],the first arm will be executed.
+
+    // not only integers,the characters in the range is OK.
+    match @char {
+        'a'..='f' => <action>,
+        ...
+    }
+! when we match the value in a range,we need patterns to cover the ranges
+  we do not interested in.
+      match u32_v {
+          0..=8 => <action>,
+          9..=u32::MAX => <action>,
+      }
+      // or
+      match u32_v {
+          0..=8 => <action>,
+          _ => <action>,
+      }
+
+pattern can be used to destructure structs,enums,and tuples to use different
+parts of them.
+
+for struct.
+    struct S {
+        x: i32,
+        y: f32,
+    }
+
+    let s = S { x: 2, y: 2.0 };
+    let S { x: @obj1, y: @obj2 } = s;
+    // @obj1 bind to @x of s,@obj2 bind to @y of s.
+when we destructure the struct object,for the data member whose type has not
+Copy trait is implemented,move semantics will be applied,thus ownership will
+be taken by the variable.
+    struct S {
+        x: String,
+    }
+    ...
+    let S { x: str } = S_obj;
+    let srx = &mut S_obj.x; // error
+because we can destructure struct,thus we can use this form in match-expression.
+    let S_obj = S { x: 2, y: 8 };  // -----+
+    match S_obj {                  //      |
+        S { x: 2, y } => ... ,     // <----+ match this arm,@y bind to 8
+        S { x, y } => ... ,        
+        S { x,y: 0 } => ... ,      
+        ...
+    }
+
+for enum.
+    match E {
+        <enum::enumerator> => <action>,
+        ...
+    }
+
+    match E_Nested {
+        <enum::enumerator(enum1::enumerator(v1, v2, ...))> => <action>,
+        ...
+    }
+
+for tuples with structs.
+    let ((tuplev1, tuplev2) , S { x: a, y: b }) =
+        ((2, 4), S { x: 2, y: 4 });
+    // @tuplev1 bind to 2.
+    // @tuplev2 bind to 4.
+    // @a bind to S::x == 2.
+    // @b bind to S::y == 4.
+
+we can use '_' pattern to ignore value in pattern.
+    fn func(_: i32, necessary: &str) { ... }
+    func(0, "call func");
+
+    match result_obj {
+        Some(_) => <action>,
+        Err(_) => <action>,
+    }
+
+if we constructed a nested object,we can use '_' to ignore values in the inners.
+    let some1 = Some(2);
+    let some2 = Some(3);
+    match (some1, some2) {
+        (Some(_), Some(_)) => <action>,
+        ...
+    }
+
+    let some3 = Some(4);
+    match (some1, some2, some3) {
+        (_, Some(_), Some(v)) => <action>, // ignore @some1,value in @some2.
+        ...
+    }
+
+we can prefix a variable with '_',to represents this variable is unused,compiler
+will not print unused variable warning,but the move/copy semantics still has
+effect.(may take ownership,because binding still happens,even we do not use it)
+but only '_' as variable,no move/copy will happens.
+    let s = Some(String::from("some"));
+    if let Some(_) = s {
+        // the string object will not be moved,ownership
+        // is not changed.
+        ...
+    }
+
+    if let Some(_move_it) = s {
+        // the string object is moved to @_move_it.
+        ...
+    }
+
+the string ".." can be used to represents the remaining of the structure.
+    let s = S { x: 2, y: 4, z: 8 };
+    let S { x: a, .. } = s; // only bind @a to @x,ignore the remaining.
+
+    match s {
+        S { _, y, .. } => <action>, // only bind @y to @s.y 
+        ...
+    }
+
+    let array_obj: [i32; 4] = [0, 1, 2, 3];
+    match array_obj {
+        [0, .., v] => <action>, // only bind @v to array_obj[@last_one],ignore
+        ...                     // the elements between [0]--[@last_one].
+    }
+! ".." must be unambiguous.
+      (.., v, ..) => ambiguous,cause compiler error.
+
+condition checking can be used with match-expression's patterns.
+    match x {
+        Some(v) if v % 2 == 0 => <action>, // @v is even
+        Some(v) => <action>,               // @v is odd
+        ...
+    }
+
+    match v {
+        0 | 1 | 2 if @cond => <action>, // (0 | 1 | 2) if <condition>
+        ...                             // not 0 | 1 | (2 if <condition>)
+    }
+
+! match-expression only.
+
+the at operator '@' can create a variable that holds a value at the same time
+we testing the value for a pattern match.
+    match some_obj {
+        // test if the value in range [0, 4].
+        Some(0..=4) => match some_obj {
+                           // bind the value.
+                           Some(v) => <action>,
+                           ...
+                       },
+        ...
+    }
+
+    ||
+    VV
+
+    match some_obj {
+        // test and bind the value if it in range [0, 4].
+        Some(value @ 0..=4) => <action>,
+        ...
+    }
+
 
 /************************** Additional *****************************************/
 
@@ -3622,4 +3863,3 @@ the loop "while let" similar to "if let" statement,but this is for loop.
     }
 
 we execute the loop,if we matched the pattern.
-
