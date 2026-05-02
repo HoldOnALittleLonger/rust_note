@@ -3734,6 +3734,171 @@ we testing the value for a pattern match.
         ...
     }
 
+Advanced Features :
+^^^^^^^^^^^^^^^^^
+
+Unsafe Rust
+-----------
+
+unsafe rust does not enforce memory safety,provides extra features.
+keyword "unsafe" can be used to start a block to contains unsafe code.
+    unsafe {
+        ...
+    }
+the features provided by unsafe are
+    > derefer a raw pointer.
+    > call an unsafe function or method.
+    > access or modify a mutable static variable.
+    > implement an unsafe trait.
+    > access fields of union object.
+! unsafe does not disable borrow checker and other safety checks.
+  when we use the five features above,compiler will not checks them for
+  memory safety.
+
+raw pointer type in unsafe code
+-------------------------------
+
+the type *const T and *mut T are the immutable and mutable raw pointers,
+respectively.immutable means the raw pointer can only be used for read data.
+
+raw pointers trait
+    > allowed to ignore the borrowing rules by having both immutable and mutable
+      pointers or multiple mutable pointers to the same location.
+    > no guarantee to point to valid memory.
+    > allowed to be null.
+    > do not implement any automatic cleanup.
+
+declare raw pointers
+    let mut num = 5;
+    let irp = &raw const num; // create *const T
+    let mrp = &raw mut num;   // create *mut T
+
+    let addr = 0x07777ffeb;
+    let mrp = addr as *mut i32; // create *mut T,value is 0x07777ffeb.
+    // let irp = 0x07777ffeb as *const i32; => create *const T.
+
+operator '*' can be used to derefer a raw pointer(only in unsafe block).
+    unsafe {
+        let x = *irp;   // value's type is T.
+    }
+
+unsafe keyword also can be used to indicates a unsafe function(similar to async).
+    unsafe fn unsafe_function() { }
+
+    unsafe {
+        unsafe_function();
+    }
+! a function contains unsafe code does not mean we need to mark the entire 
+  function as unsafe.generally,we can wrap unsafe code into a safe function,
+  to build safe abstrction over unsafe code.
+      use std::slice;
+
+      fn return_raw_pointers(array: &mut [i32], mid: u32)
+      -> (&mut [i32], &mut [i32]) {
+          let size: usize = array.len();
+          assert!(mid <= size);
+          let rp = array.as_mut_ptr();
+
+          // result of a unsafe block is the last expression.
+          // both slice::from_raw_parts_mut() and add() of raw pointer are
+          // unsafe function.
+          unsafe {
+              (
+                  // slice::from_raw_parts_mut(@rp, @length) can be used to
+                  // create a slice over a raw pointer.
+                  slice::from_raw_parts_mut(rp, mid),
+
+                  // member method add() of raw pointer can execute
+                  // pointer addition.
+                  slice::from_raw_parts_mut(rp.add(mid), size - mid),
+              )
+          }
+
+      }
+
+Using "extern" Functions to Call External Code
+----------------------------------------------
+
+keyword "extern" can let us to use a Foregion Function Interface(FFI),it is a
+way for a programming language to define functions and enable a different
+programming language to call those functions.
+    unsafe extern "C" {
+        fn abs(i: i32) -> i32;
+    }
+
+    unsafe {
+        println!("abs is {}", abs(-2));
+    }
+
+we introduce an external function from C named abs(),and invoke it within the
+unsafe code.we need to reforge its prototype into the rust format,as the
+declaration.
+
+the rust also supports call the rust function from other programming language.
+#[unsafe(no_mangle)]
+    this attribute is necessary for tell the rust compiler not to mangle the name
+    of this function.
+    # mangling is when a compiler changes the name we have given a function to
+      a different name that contains more information for other parts of the
+      compilation process to consume but is less human readable.
+
+by combine the keywords "pub" and "extern",we can declare the function can be
+called from other language.
+    #[unsafe(no_mangle)]
+    pub extern "C" fn call_rust_fn_from_c() { ... }
+
+    // "C" has limited the programming language which can invoke this function.
+    // now we can invoke call_rust_fn_from_c() from C code.
+
+Accessing or Modifying a Mutable Static Variable
+------------------------------------------------
+
+unsafe allows us to operate mutable static variable.
+    static mut STATIC_VAR: i32 = 2; // initialized to 2.
+
+    unsafe {
+        STATIC_VAR += 2; // now @STATIC_VAR is 4.
+        let rp = &raw const STATIC_VAR;
+        println!("value is {}", *rp);
+    }
+
+#[allow(static_mut_refs)]
+    this attribute can tell compiler the function is allowed to use a reference
+    to a mutable static variable.
+
+Unsafe Trait
+------------
+    unsafe trait UnsafeTrait {
+        ...
+    }
+
+    unsafe impl UnSafeTrait for <type> {
+        ...
+    }
+
+a trait is unsafe when at least one of its methods has some invariant that the
+compiler can not verify.
+for the method in unsafe trait is not unsafe method,nor contains unsafe code,
+we can invoke it in safe code.
+
+Accessing Union Fields
+----------------------
+
+a union is similar to a struct,but only one declared field is used in a particular
+instance at one time.
+    union TheUnion {
+        x: i32,
+        y: i32,
+        z: f32,
+    }
+
+    // the rest fields are arbitraty value,access them is OK,but
+    // the values of them are meaningless.
+    let u = TheUnion { x: 20 };
+    
+    unsafe {
+        println!("u.x is {}", u.x);
+    }
 
 /************************** Additional *****************************************/
 
