@@ -3900,6 +3900,156 @@ instance at one time.
         println!("u.x is {}", u.x);
     }
 
+Advanced Traits
+---------------
+
+the trait associated type plays the role as a type placeholder,when a trait is
+implemented for a certain type,this associated type will gets real type.
+    trait UseAType {
+        type inner_type;
+        fn do_something(&self) -> Self::inner_type {
+            Self::inner_type::new()
+        }
+    }
+the disadvantage of generic type against trai associated type is,we need to
+annotate the types in each implementation.
+    trait TraitGT<T> {
+        fn do_something(&self) -> T;
+    }
+
+    impl TraitGT<String> for TheStruct { }
+    impl TraitGT<u32> for TheStruct { }
+    impl TraitGT<TheStruct> for TheStruct { }
+
+    let ts = TheStruct { };
+
+    <TheStruct as TraitGT<String>>::do_something(&ts);
+    <TheStruct as TraitGT<u32>>::do_something(&ts);
+    <TheStruct as TraitGT<TheStruct>>::do_something(&ts);
+trait is implemented for the certain structure multiple times,thus we need to
+specify where the method we want to invoke come from,via the type annotation.
+if we use the trait associated type,the trait for a certain type can only be
+implemented once.
+
+Default Generic Parameters and Operator Overloading
+---------------------------------------------------
+
+syntax to specify default generic parameter.
+    struct TheStruct<T = u32> {
+        x: T,
+    }
+
+    impl<T> TheStruct<T> {
+        fn x(&self) -> &T { &self.x }
+    }
+we can not specify default generic type for the generic function.
+
+default generic type is useful is with "operator overloading".note,we can not
+makeup a new operator,or overload arbitrary operators.the allowed operations and
+corresponding traits are listed in "std::ops",by implementing the traits
+associated with the operator.
+    struct TheStruct { }
+
+    impl Add for TheStruct {
+        fn add(self, rhs: TheStruct) -> TheStruct { ... }
+    }
+with default generic type.
+    trait Add<Rhs = Self> {
+        type Output;
+        fn add(self, rhs: Rhs) -> Self::Output;
+    }
+in the previous example,we did not specify the certain type for @Rhs,thus it
+will implicitly be the type we implement Add trait on it,it is TheStruct.
+
+we can also specify the generic type,to achieve addition between two different
+types if we have known the details of them.
+    struct TheStruct { x: usize, }
+
+    impl Add<String> for TheStruct {
+        type Output = usize;
+        fn add(self, rhs: String) -> Self::Output {
+            self.x + rhs.len()
+        }
+    }
+
+    let ts = TheStruct { ... };
+    let str = String::from(...);
+    let result = ts + str;  // operator overload.
+
+the main usage of default generic type
+    1> extend a type without breaking existing code.
+    2> allow customization in specific cases most user wont need.
+
+Disambiguating Between Identically Named Methods
+------------------------------------------------
+
+rust allows a type implements several traits,if the traits have the functions
+as the same name,when we invoke the function,need to tell rust which one we
+want to call.
+    let ts = TheStruct { };
+    Trait1::do_something(&ts);
+    Trait2::do_something(&ts);
+    Trait3::do_something(&ts);
+    ...
+    
+    // no @self parameter functions.
+    // if the methods have no @self parameter,then
+    // there could be other types that implement
+    // this trait,we need to specify which one
+    // we want to invoke.
+    <@certain_type as @trait>::method();
+    ...
+
+Supertraits
+-----------
+
+the first trait is relied by second trait is called a supertrait,so the second
+trait can only be used for the type has implemented the first trait.
+    struct TheStruct { }
+
+    trait <first_trait> {
+        ...
+    }
+
+    impl <first_trait> for TheStruct {
+        ...
+    }
+
+    trait <second_trait>: <first_trait> {
+        ...
+    }
+
+    impl <second_trait> for TheStruct {
+        ...
+    }
+through this way,we can define what the type can use the specified feature.
+! similar to adding a trait bound to another trait.
+
+Implementing External Traits with the Newtype Pattern
+-----------------------------------------------------
+
+we can only implement a trait on a type when the trait is visible to the type,or
+the type is visible to the trait.
+but we can do this indirectly through a wrapper,and let the wrapper become a
+brige between the external trait and the external type.
+    // tuple struct.
+    struct VecWrapper(Vec<i32>);
+
+    impl fmt::Display for VecWrapper {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            // we can construct a format string to contains
+            // elements in the vector of this tuple struct(wrapper),
+            // to print a vector through its wrapper.
+            // # @self.0 is the vector in wrapper.
+            ...
+            write!(f, ...);
+            ...
+        }
+    }
+
+    let vec_wrapper: VecWrapper = VecWrapper(vec![...]);
+    println!("vec_wrapper is {vec_wrapper}");
+
 /************************** Additional *****************************************/
 
 Some Useful Rust Stuff :
