@@ -4050,6 +4050,153 @@ brige between the external trait and the external type.
     let vec_wrapper: VecWrapper = VecWrapper(vec![...]);
     println!("vec_wrapper is {vec_wrapper}");
 
+Advanced Types
+--------------
+
+we can use newtype pattern to enforce type safety and abstraction.
+    struct NewU32(u32);
+
+    fn func(v: NewU32) {
+        ...
+    }
+
+    let new_v = NewU32(20);
+    func(new_v);    // OK
+
+    let u32_v = 20;
+    func(u32_v);    // ERROR
+even the inner of NewU32 is u32 type same as type of @u32_v,the function still
+refuses pass an argument is type of u32 instead NewU32.
+use this encapsolution,we can wrap the existed type to newtype to do type
+abstraction,if later the inner of newtype is changed,its user do not need to
+worry about that,because we have hidden the implementation detail.
+
+the "type" keyword in rust can be used to make a type alias.
+    type NewU32 = u32; // NewU32 is synonym of u32,now.
+we have known this keyword in trait associated type,there is its another
+feature.
+the type alias is different from newtype pattern,where the place need the original
+type can use the alias as instead.
+    fn func(x: u32);
+    let new_v: NewU32 = 20;
+    func(new_v); // OK
+type alias can help us to reduce repetition,
+    Box<dyn Fn() + Send + 'static> // Box type
+
+    let lf: Box<dyn Fn() + Send + 'static> = Box::new(|| println!("func"));
+
+    type StaticSendFunc = Box<dyn Fn() + Send + 'static>;
+    let lf1: StaticSendFunc = Box::new(|| println!("lf1"));
+like the "typedef" in C and C++.
+we can use generic type in type alias,let the type can adaptive different cases.
+    // we can ignore std::io::Error now.
+    type Result<T> = Result<T, std::io::Error>;
+
+rust has a special type named '!' that is known in type theory lingo as the
+"empty type",it has no values.
+or called it "never type",because it stands in the place of the return type when
+a function will never return.
+function that return never type is called "diverging function".
+    fn do_exit(task: Task) -> ! {
+        ...
+        schedule();
+    }
+we can not create an object is type of '!',thus such function can not create
+return value,it can never possibly return.
+! '!' can be used in match-expression arms.because match-expression requires
+  each arm has the same type,if one arm return '!' type,then this type will be
+  ignored by compiler.
+  panic!() has the never type,so we can use it in match-expression arms and
+  compiler does not complain.
+  a loop expression do not has condition to break cycle,type of its value is
+  the '!' type.
+
+the concept of "dynamically sized types",sometimes referred to as DSTs or 
+unsized types,these types allow us to use the type its size can only be known
+at runtime.
+for example,the type "str" is DST,and we can not create value is type of DST
+directly,instead,we need to use the slice type "&str".
+slice data structure only stores the starting position and the length of the slice.
+hence,we can know the size of slice type at compile time,size of memory address
+data and the size of length data.
+dynamically sized types in rust have an extra bit of metadata that stores the
+size of the dynamic information,we must always put values of dynamically sized
+types _behind_ a pointer of some kind.
+    Box<str>
+    &str
+every trait is a dynamically sized type,we can create trait object.
+    Box<dyn <trait-name>>
+    &dyn <trait-name>
+rust provides "Sized" trait to determine whether or not a type's size is known
+at compile time,this trait is automatically implemented for everything its size
+can be known at compile time,in addition,rust implicitly adds a bound on "Sized"
+to every generic function.
+    fn generic_func<T>(v: T);
+    fn generic_func<T: Sized>(v: T);
+generally,generic function can only works on types that size is known at compile
+time,but we can relax this restriction.
+    // we use &T to instead T in parameter list,this is because
+    // the type T may not be Sized,in this case,we must use
+    // a pointer to wrap it.
+    fn generic_func<T: ?Sized>(v: &T);
+a trait bound on "?Sized" means "T may or may not be Sized".
+"?<trait-name>" can only be available on "Sized" trait.
+
+Advanced Functions and Closures
+-------------------------------
+
+the "fn" type is called a function pointer,we can passing functions with function
+pointers to another function as its arguments.
+    fn need_a_func(tf: fn());
+to specify parameters for function pointer,we can list the types of its parameters.
+    fn need_a_func(tf: fn(i32, u32, &String));
+! Fn closure trait do not confused with "fn" type,"fn" is a type,not a trait,
+  it can not be used in the generic type trait bound.
+function pointers implement all three of the closure traits,Fn,FnMut,FnOnce.
+so we can pass the function pointer as an argument for a function that expects
+a closure.
+    fn need_a_fnclosure<T>(callable: T)
+    where
+        T: Fn()
+    {
+        ...
+        callable();
+        ...
+    }
+    // need_fnclosure<>() can receives a function pointer,or a closure.
+    // if we want the trait bound receives arguments,then we can list types
+    // in the parameter list.
+    //     fn need_a_fnclosure<T: Fn(u32)>(callable: T);
+    // if we pass to the function a function pointer receives no parameter,
+    // compiler will throws error.
+    // if we pass to the function a closure,we can use wildcard '_' to ignore
+    // the parameter.
+    //     need_a_fnclosure(|_| ...);
+! the name of each enum variant that also becomes an initializer function.
+      let x = EnumType::Enumerator1();
+
+in rust,closures are represented by traits,we can not return closures directly,
+but we can use the "impl" keyword to return a trait object,then we can return
+a closure from a function indirectly.
+    fn return_closure() -> impl Fn(u32) -> u32 {
+        |x: u32| x + 1
+    }
+! each closure is also its own distinct type,even functions' signatures are the
+  same "impl Fn(u32) -> u32",the closures they returned are not the same type.
+  return "impl <trait-name>" type,rust will creates a unioque opaque type,the 
+  detail of this type is constructed by rust,it is not visible to us,even the 
+  trait is same,the opaque types rust generates for each are distinct.
+  to solve this problem,we can wrap the trait object in a Box pointer.
+      fn return_closure() -> Box<dyn Fn(u32) -> u32> {
+          ...
+      }
+
+      // same type,Box<...>.
+
+      fn return_closure_move() -> Box<dyn Fn(u32) -> u32> {
+          Box::new(move || ...);
+      }
+
 /************************** Additional *****************************************/
 
 Some Useful Rust Stuff :
