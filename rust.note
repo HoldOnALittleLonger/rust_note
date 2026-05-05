@@ -4197,6 +4197,188 @@ a closure from a function indirectly.
           Box::new(move || ...);
       }
 
+Macros
+------
+
+fundamentally,macros are a way of writing code that writes other code,which is
+known as "metaprogramming".
+
+for a function,its signature must declare the number and type of parameters the
+function has,but for macro,can take a variable number of parameters.
+macro expanding will happens at pre-processing phase,before compile the real
+code,but a function can only be executed at runtime.
+
+in rust,most widely used form of macros is "declarative macro".it allows us to
+write something similar to a match-expression.
+for define a macro,we need to use "macro_rules!" construct.
+    #[macro_export]
+    // defining macro vec!
+    macro_rules! vec {
+        // pattern.
+        ( $( $x:expr ),* ) => {
+            {
+                // code will replace the macro.
+                let mut temp_vec = vec::new();
+                $(
+                    temp_vec.push($x);
+                )*
+                temp_vec
+            }
+        }
+    }
+    // the simplified vec! macro.
+    // there is only one pattern,if vec! failed to match it,
+    // an error would be thrown by compiler.
+
+#[macro_export]
+    this attribute is used to indicates that this macro should be made available
+    whenever the crate in which the macro is defined is brought into scope.
+    # export the macro.
+
+the pattern syntax,matched against rust code structure rather than values,thus
+it is seem like a little weird.
+pattern is included into '()',and symbol '$' can be used to declare a variable
+in the macro system,that will contain the rust code matching the pattern.
+'$x:expr' is a marco variable named @x match any rust expression,it captures
+values that match the pattern.
+comma ',' as a separator of instances,and '*' specifies the pattern matches zero
+or more of whatever precedes the '*'.(like the regex expression * symbol)
+    vec![0, 1, 2, 3]
+    ||
+    VV
+    vec {
+                       +-------------+--+--+
+                       |             |  |  |
+                       |             V  V  V
+          <<<<<<<<<<<<<=             -- -- --
+        ( $( $x:expr ),* ) match [0, 1, 2, 3]
+             =======              -- 
+                   |              ^   
+                   |              |   
+                   +--------------+   
+                    $x:expr matches expressions 0 1 2 3
+                    $(),*  matchesthe rust code [0, 1, 2, 3]
+
+        => { # code block to replace.
+
+            let temp_vec = vec::new();
+
+            # for each $(),replace code to the following statement.
+            # $x is the expression in the matched rust code.
+            # it is 0 1 2 3
+            $(
+                temp_vec.push($x);
+            )*
+            # '*' means zero or more,depends on the matched patterns.
+            --> temp_vec.push(0);
+                temp_vec.push(1);
+                temp_vec.push(2);
+                temp_vec.push(3);
+
+            # finally,we return ownership from this code block.
+            temp_vec
+        }
+    }
+
+the second form of macro is the procedural macro,which acts more like a function,
+and is a type of procedure.
+procedual macro accepts code as an input,operate on that code,and produce code
+as an output.
+three kind procedual macros
+    1> custom "derive".
+    2> attribute-like.
+    3> function-like.
+the procedural macro must be defined in its own crate with a special crate type.
+    use proc_macro::TokenStream;
+
+    #[custom_attribute_example]
+    pub fn attr_example(input: TokenStream) -> TokenStream {
+        ...
+    }
+TokenStream represents a sequence of tokens.the source code that the macro is
+operating on makes up the input TokenStream,and the code the macro produces is
+the output TokenStream.
+#[...] the attribute specifies which kind of procedural macro it is.
+
+for a derive procedural macro,its crate usually has name "<crate name>_derive",
+custom derive still a derive attribute can only be used on structs and enums.
+    use proc_macro::TokenStream;
+    use quote::quote;
+
+    #[proc_macro_derive(<derive_macro_name>)]
+    pub fn <procedural_marco_fn>(input: TokenStream) -> TokenStream {
+        let ast = syn::parse(input).unwrap();
+        impl_<macro_name>(&ast)
+    }
+
+    // the "syn" crate parses rust code from a string into data structure that
+    // we can perform operations on.
+    // the "quote" crate turns "syn" data structures back into rust code.
+    
+    # for @derive_macro_name,if we defining a macro to implement a trait for
+    # a certain type,the name should follow the style "<trait-name>_derive".
+    # the detail of that trait should be defined in the crate "<trait-name>".
+    # (convention)
+
+    fn impl_<macro_name>(ast: &syn::DeriveInput) -> TokenStream {
+        let idt = &ast.ident;
+        let output = quote! {
+            impl <trait-name> for #idt {
+                fn <trait-function-name>() {
+                    ...
+                }
+            }
+        };
+    }
+    // '#' will turns the content in variable @idt to literal,like
+    // the '#' in C and C++ macro.
+    //     @idt == MyStruct 'struct name,as the type'
+    //     #idt => MyStruct 'literal'
+    // rust has a built-in macro named "stringify!",it takes a rust expression
+    // and converts it into a string literal at compile time,we can refer @idt
+    // and convert it into string literal.
+    //     stringify!(#idt) => "#idt"
+
+    #[derive(<derive_macro_name>)]
+    struct MyStruct { }
+
+    ||
+    VV
+
+    # quote! output.
+                          # DeriveInput::ident from syn::parse().
+                          # referred through #idt at above.
+    impl <trait-name> for MyStruct {
+        fn <trait-function-name>() {
+            ...
+        }
+    }
+
+the attribute-like macro similar to custom derive macro,but instead of generate
+code for the "derive" attribute,it allow us to create new attribute,and the 
+attribute can be applied to almost all items,not only structs and enums.
+    #[proc_macro_attribute]
+    pub fn <macro_attr_name>(...) -> ... {
+        ...
+    }
+
+    #[<macro_attr_name>(...)]
+    fn another_function() {
+        ...
+    }
+
+the function-like macro define macro that look like function calls,similar to
+macro_rules!,but more flexible than functions.
+macro_rules! can only use match-like syntax in it,but function-like procedural
+macro has no such restriction.
+    #[proc_macro]
+    pub fn <function_like_macro>(input: TokenStream) -> TokenStream {
+        ...
+    }
+it is not an attribute,instead,we can invoke it like a function,like the 
+println! macro.
+
+
 /************************** Additional *****************************************/
 
 Some Useful Rust Stuff :
