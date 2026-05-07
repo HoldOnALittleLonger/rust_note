@@ -1187,7 +1187,7 @@ The "match" Control Flow Construct >
     "if let" can be used with the "let" keyword to declare an object.
         let x = if let ... ;
     but a more concise version is exist.
-        let x = Enum::ENUM(String::from("let..else"));
+        let x = Enum::ENUM(String::from("let...else"));
         let Enum::ENUM(s) = x else {
             ...
         };
@@ -4441,6 +4441,15 @@ std::string::String::to_lowercase()
 
 ! usually,the member methods of String object can also works on a slice object.
 
+we can compare whether or not two string is the same in the if-statement through
+the '==' operator,this also works for slice type.
+    let str = "string..";
+
+    // True
+    if str == "string.." {
+        ...
+    }
+
 File I/O
 --------
 
@@ -4507,3 +4516,72 @@ the loop "while let" similar to "if let" statement,but this is for loop.
     }
 
 we execute the loop,if we matched the pattern.
+
+TCP Connection in Rust
+----------------------
+
+standard library contains module named "net",in which the type "TcpListener" can
+be used to build a network endpoint over TCP.
+
+bind(@endpoint) -> Result<TcpListener>
+    the member function bind() can be used to register a TCP endpoint,it receives
+    a string composed by ip address and port number "ip-address:port",return
+    Result<> type.
+
+incoming() -> Incoming<>
+    member method incoming() start listening on the specified endpoint,and wait
+    for client connection.
+    if a connection is entablished,it will return an Incoming<> type,it is an
+    iterator over the connections being received on this listener.
+    we can unwrap() on the iterator to get the stream for current connection,
+    next() on the iterator will advance this iterator to next connection.
+    ! the stream is represents by TcpStream.
+
+write_all(@bytes) -> Result<>
+    member method write_all() of TcpStream can be used to write data to peer.
+
+to read the stream,rust provides a type BufReader,we can pass reference to the
+TcpStream to its new() method to construct an object is type of BufReader,then
+we can use BufReader's methods to handle the stream.
+
+lines() -> Lines<>
+    BufReader implemented BufRead trait,thus method lines() also works on it.
+    this method format stream to lines,the Lines<> type is an iterator over the
+    lines.
+
+map(@closure) -> Map<>
+    method map() of Lines<> can be used to deal with each lines through the
+    iterator,it will return Map<> type.the Map<> type is also an iterator over
+    the mapped lines.
+
+take_while(@predicate-closure) -> TakeWhile<>
+    method take_while() of Map<> type can be used to create an iterator that
+    yields elements based on a predicate.
+
+collect() -> <ContainerType>
+    method collect() of an iterator can be used to convert the sequence to a
+    container type.
+    ! used generic type.
+
+HTTP Packet
+------------
+
+a HTTP request takes the following format.
+    <HTTP Method> <Request-URI> <HTTP-Version><CRLF>
+    <HTTP Headers><CRLF>
+    <HTTP Message Body>
+
+a HTTP respone takes the following format.
+    <HTTP-Version> <HTTP-Status-Code> <Reason-Phrase><CRLF>
+    <HTTP Headers><CRLF>
+    <HTTP Message Body>
+
+where CRLF is "carriage return and line feed".sequence "\r" means carriage return,
+and sequence "\n" means line feed.
+usually CRLF is "\r\n",but it is rarely to be printed.
+! we usually insert another one CRLF between message body and headers.
+      <header> <crlf>
+      <crlf>
+      <body>
+    
+
