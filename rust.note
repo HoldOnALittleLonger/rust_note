@@ -1054,6 +1054,10 @@ as the structure,keyword "impl" is needed.
     let mut error_result=ErrorEnum::ERROR_FATAL(-32, String::from("fatal"));
     error_result.handle_fatal();
 
+! if we defined custom enumeration type,and use the Result<> to wrap it,we must
+  let the enumeration type implements Debug trait,then we are able to invoke the
+  unwrap() method of this Result<> type.
+
 rust standard library provides a pre-defined enumeration type,named "Option".
 "Option" can be used to describe a value could be something or it could be nothing.
 for represent it,tradinal language such C and C++ use NULL value to descripbes
@@ -1374,7 +1378,14 @@ C++.
 keyword "as" can be used together with "use" to alias a type.
     use std::io::Result as IoResult;
 there "IoResult" is the new name of the type std::io::Result in current crate.
+in addition,we can use "as" to make an alias to another external crate,to
+simplify its name.
+    external crate : the_external_crate
+
+    use the_external_crate as tec;
+    use tec::*;
 ! in C and C++,"typedef" and "using" can do the same.
+
 
 when we bring a name into scope with the "use",the name is private to the scope
 into which we imported it.but we can re-export the name from this scope,"pub"
@@ -1475,6 +1486,11 @@ collection Vec<T> >
 
         let iv1 = vec![1, 2, 3]; // type is auto deduced to i32,integer default.
                 //^initilization
+
+    constructor with_capacity(@size) of Vec can be used to create a vector with
+    specified size of element slots.
+        let four_e_vec = Vec::with_capacity(4);
+
     member method push() can be used to update a vector object.
         iv.push(1);
         iv.push(2);
@@ -2126,6 +2142,8 @@ lifetime elision rules >
 there is a special lifetime annotation,it is "'static",it denotes that the
 affected reference can live for the entire duration of the program.
     let str_ref: &'static str = "static str";
+we can specify the lifetime specifier 'static into a trait bound to tell rust
+the type with the specified trait should be static.
 
 we can combine generic lifetime parameter and generic type,in both structure
 definition and function definition.
@@ -2744,6 +2762,7 @@ function std::thread::sleep(@duration) can be used to let current thread sleep
 a while.
     std::thread::sleep(std::time::Duration::from_millis(100));
                       //^ rust time duration,will sleep 100ms.
+    // there is another duration conversion is from_secs(@seconds).
     
 the return type of spawn() function is JoinHandle<T>,we can store them somewhere
 when we spawn the new thread,and use the handle to wait for it finish in the
@@ -2753,6 +2772,9 @@ main thread.
     handle.join().unwrap();
 the member method join() of JoinHandle<T> will returns a Result object,then we
 can know whether the new thread is joined successfully.
+! if OS failed to create a new thread for spawn(),then this function will panic,
+  the more safety alternative method is use std::thread::Builder type,its spawn()
+  method will returns Result<> type rather than return JoinHandle<> directly.
 
 if our main thread is a producer,and new thread is consumer,when we spawn a 
 new thread,we should use "move" keyword on the closure to transfer the ownership
@@ -3553,6 +3575,18 @@ matching literals.
         ...
         _ => <action>,
     }
+
+matching string.
+    let str: String = String::from("hello");
+    match &str[..] {
+        "hello" => ... ,
+        _ => ... ,
+    }
+
+    ! we must construct a slice type from @str because match-expression do not
+      processes automatically conversion between String type and Slice type.
+      where the first arm "hello" is type of string slice.
+      if we using iff-statement to match the string will no such worry.
 
 the named variable in @pattern is irrefutable.
     let obj = get_result();
@@ -4500,6 +4534,12 @@ the process is >
     3> refactor core crate,and ensure the test continue to pass.
     4> repeat from 1>.
 
+! another method is Compiler-Driven Development,in this design model,we use the
+  APIs are not available now like they are been there.we compile the program
+  without to provide implementations compiler will throws error.next,we follow
+  the error messages to provide implementations for those APIs.
+  such design also called Bottom-To-Top design.
+
 unimplemented!() macro
 ----------------------
 
@@ -4516,6 +4556,16 @@ the loop "while let" similar to "if let" statement,but this is for loop.
     }
 
 we execute the loop,if we matched the pattern.
+! if we get MutexGuard<> from a mutex in the condition testing of while-let,
+  then the lock will be released after once iteration ends or the whole loop
+  stopped.
+      while let Ok(v) = arc_rx.lock().unwrap().recv() {
+          // MutexGuard<> acquired mutex lock.
+          ...
+          // MutexGuard<> release mutex lock.
+      }   
+  this problem may decay the multi-threads behavior to single-thread behavior,
+  that is not we expected.
 
 TCP Connection in Rust
 ----------------------
