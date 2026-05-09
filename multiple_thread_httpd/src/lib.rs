@@ -15,19 +15,6 @@ use std::{
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
 /*
- * ThreadPool - thread pool to holds workers and a communication
- *              channel to workers
- * @workers:    all workers
- * @request_sender:
- *              mpsc::Sender<> type object used to send Job to
- *              worker
- */
-pub struct ThreadPool {
-    workers: Vec<Worker>,
-    request_sender: mpsc::Sender<Job>,
-}
-
-/*
  * Worker - worker descriptor used to represents work thread
  * @id:     identifier
  * @local_thread:
@@ -54,11 +41,24 @@ impl Worker {
             local_thread: thread::spawn(
                 move || {
                     loop {
+                        let msg = arc_rx.lock().expect("should got mutex lock.").recv();
+                        match msg {
+                            Ok(job) => {
+                                println!("worker {id} got a job.");
+                                job();
+                            },
+                            _ => {
+                                println!("worker {id} getting job failed,quit.");
+                                break;
+                            },
+                        }
+/*
                         let job = arc_rx.lock().expect("should got mutex lock.")
                             .recv().unwrap();
                         /* println!() always takes reference than ownership. */
                         println!("worker {id} got a job.");
                         job();
+*/
                     }
 
                     /*
@@ -80,6 +80,29 @@ impl Worker {
                 ),
             }
     }
+
+    fn id(&self) -> usize {
+        self.id
+    }
+
+/*
+ *  We can not move out the inner from an object through a mutable reference
+ *  to that object.
+ *  If we need do this,should pass @self(pass ownership) instead pass a reference.
+ *  But this will let the object referred in previous context becomes invalid,
+ *  if we no longer need this object,we can follow this way.
+ *  We can invoke std::mem::take() on the field's mutable reference to take its
+ *  ownership,this requires the type of this field implemented Default trait.
+ *  Method std::mem::replace() can be used swap the field's value,and returns
+ *  the previous value of this field.
+ *  If we wrapped the field in Option<>,we can invoke take() method of Option<>
+ *  to take the ownership of the Some(v).
+ *
+    fn thread_handle(&mut self) -> thread::JoinHandle<()> {
+        std::mem::take(&mut self.local_thread)
+        // std::mem::replace(&mut self.local_thread, @new_value)
+    }
+*/
 }
 
 /*
@@ -89,6 +112,19 @@ impl Worker {
 #[derive(Debug)]
 pub enum ThreadPoolError {
     TP_ERROR_BAD_AVAILABLE,
+}
+
+/*
+ * ThreadPool - thread pool to holds workers and a communication
+ *              channel to workers
+ * @workers:    all workers
+ * @request_sender:
+ *              mpsc::Sender<> type object used to send Job to
+ *              worker
+ */
+pub struct ThreadPool {
+    workers: Vec<Worker>,
+    request_sender: Option<mpsc::Sender<Job>>,
 }
 
 impl ThreadPool {
@@ -117,7 +153,7 @@ impl ThreadPool {
                 Self {
                     workers: workers_vec,
                     /* move @tx */
-                    request_sender: tx,
+                    request_sender: Some(tx),
                 }
             )
         }
@@ -131,6 +167,16 @@ impl ThreadPool {
         F: FnOnce() + Send + 'static
     {
         let new_job: Job = Box::new(f);
-        self.request_sender.send(new_job).unwrap();
+        self.request_sender.as_ref().unwrap().send(new_job).unwrap();
+    }
+}
+
+impl Drop for ThreadPool {
+    fn drop(&mut self) {
+        std::mem::drop(self.request_sender.take());
+        for t in self.workers.drain(..) {
+            println!("worker {} shutting down.", t.id());
+            t.local_thread.join().unwrap();
+        }
     }
 }

@@ -67,8 +67,10 @@ fn main() {
     let tcp_listener = TcpListener::bind(IPv4_ENDPOINT).unwrap();
     println!("httpd started.");
 
-    for iter_connection in tcp_listener.incoming() {
+    for iter_connection in tcp_listener.incoming().take(2) {
         let connection = iter_connection.unwrap();
         thread_pool.execute(|| handle_http(connection));
     }
+
+    println!("shutting down.");
 }

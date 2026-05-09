@@ -1491,6 +1491,17 @@ collection Vec<T> >
     specified size of element slots.
         let four_e_vec = Vec::with_capacity(4);
 
+    member method drain() allows us to drain everything from the vector.
+        drain(@range_parameter) -> iter_to_drained_items
+
+        for s in string_vector.drain(..) {
+            // drain everything from the vector.
+            // @s represents the each drained element.
+            // @s is not a referrence,it is a variable
+            // bound to the element,and has ownership.
+            ...
+        }
+
     member method push() can be used to update a vector object.
         iv.push(1);
         iv.push(2);
@@ -2477,6 +2488,14 @@ method sum() defined in Iterator trait,will takes the ownership of that iterator
 and computes the sum from the sequence by invoke next() repeatedly.
     let result = viter_for.sum();
 
+member method take(@n) is defined in Iterator trait,it can be used to limits the
+iteration to the first two items at most.
+    for c in tcp_listener.incoming().take(4) {
+        // take the first two connection from
+        // incoming TCP connection.
+        ...
+    }
+
 Other iterators
 ---------------
 
@@ -2656,6 +2675,9 @@ reference.
   in Drop trait.
   function std::mem:drop() also is included in prelude.    
   # std::mem::drop() takes ownership of the object.
+! Drop will happens when panicking,if we called unwrap() method in drop(),
+  there is a possibility to cause a double panic,that will immediately
+  crashes the program and ends any cleanup in progress.
 
 Reference-Counted Smart Pointer
 -------------------------------
@@ -4495,6 +4517,42 @@ std::fs::read_to_string(@file_name)
     contents into a String object.
     if succeed,return a Result<String> object.
     ! this function will saves the file's contents into a single String object.
+
+Move out inner
+--------------
+
+to move out the inner of an object behind "&mut self" reference,there is three
+ways.(member method returns inner)
+the first way is use std::mem::take(&mut self.@field) method,it will takes the
+ownership of the inner and return it,the field's value will be set to default
+value,thus the type of this field need to implements Default trait.
+    fn take(&mut self) -> InnerType {
+        std::mem::take(&mut self.inner)
+    }
+the second way is use std::mem::replce(&mut self.@field, @new_value) method,
+it will swaps the field's value with @new_value,and return the previous value.
+    fn take(&mut self) -> InnerType {
+        let new_v: InnerType = InnerType::new();
+        std::mem::replace(&mut self.inner, new_v)
+    }
+the third way is use Option<> to wrap the inner,and then invoke take() method
+of Option<> to take ownership of Some(v).
+    fn take(&mut self) -> InnerType {
+        self.inner.take()
+    }
+
+! if we no longer need @self,then we can pass ownership to the take() method,
+  and just move out inner from @self.
+      fn take(self) -> InnerType {
+          self.inner
+      }
+  if we want to move out the inner of the object declared in current context,
+  we can just take the ownership of the inner as well.
+      let obj: ContainInner = ContainInner::new();
+      ...
+      let take_inner = obj.inner; // take ownership.
+                                  // any referring to this inner after
+                                  // this statement will be illegal.
 
 Standard Error
 --------------
