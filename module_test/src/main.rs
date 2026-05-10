@@ -7,6 +7,8 @@ use crate::module_z::module_z::func_z;
 mod fname_as_module;
 use crate::fname_as_module::fname_as_module_func;
 
+use module_test::*;
+
 fn main() {
     func();
     func_z();

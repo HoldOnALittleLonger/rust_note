@@ -1,3 +1,5 @@
+                                                                Rust The Book
+
 Cargo :
 ^^^^^
 cargo is rust's build system and package manager.
@@ -1259,6 +1261,37 @@ rustc's work >
     the "use" keyword
         within a scope,the "use" keyword creates shortcuts to items
         to reduce repetition of long paths.
+
+    <project>
+    |
+    +-------- Cargo.lock
+    |
+    +-------- Cargo.toml
+    |
+    +-------- src
+              |
+              +---- main.rs
+              |     \
+              |      use <project>::*; 
+              |      mod <module1>; 
+              |      use crate::<module1>::<sub_module>::*;
+              |                                            
+              +---- lib.rs                                 
+              |     \                                      
+              |      mod <module2>;                        
+              |      pub use crate::<module2>::*;
+              |                                  
+              +---- <module1>                    
+              |     |                            
+              |     +-------- <sub_module>.rs    
+              |                                  
+              +---- <module1>.rs
+              |     \
+              |      pub mod <sub_module>;
+              |    
+              +---- <module2>
+                    |
+                    +------- mod.rs
 
 we can group related code in modules,this also rely on the "mod" keyword.
     mod <module-name> {
@@ -4299,6 +4332,30 @@ in the macro system,that will contain the rust code matching the pattern.
 values that match the pattern.
 comma ',' as a separator of instances,and '*' specifies the pattern matches zero
 or more of whatever precedes the '*'.(like the regex expression * symbol)
+
+the pattern "$()" to match rust statement must followed by one of
+    '*' => zero or more
+    '+' => one or more
+    '?' => zero or one
+these symbols are repetition operators,determine how many times a particular
+pattern can appear in the macro's input -- the rust statement.
+
+! if we want the declarative macro receives no arguments,we can let the
+  pattern empty.
+      macro_rules! print_hello {
+          () => { println!("hello"); }
+      }
+      print_hello!();
+  if we want the declarative macro receives limited arguments,we can list
+  parameters in pattern.
+      macro_rules! add_macro! {
+          ( $lhs:expr, $rhs:expr ) => {
+              $lhs + $rhs
+          }
+      }
+      add_macro!(2, 4);    // OK
+      add_macro!(2, 3, 4); // ERROR
+
     vec![0, 1, 2, 3]
     ||
     VV
@@ -4308,18 +4365,27 @@ or more of whatever precedes the '*'.(like the regex expression * symbol)
                        |             V  V  V
           <<<<<<<<<<<<<=             -- -- --
         ( $( $x:expr ),* ) match [0, 1, 2, 3]
-             =======              -- 
+          =============           -- 
                    |              ^   
                    |              |   
                    +--------------+   
-                    $x:expr matches expressions 0 1 2 3
-                    $(),*  matchesthe rust code [0, 1, 2, 3]
+                    $x:expr matches expressions
+                        0
+                        1
+                        2
+                        3
+                    $( $x:expr ), matches the full expressions
+                        0,
+                        1,
+                        2,
+                        3,
+                    '*' means repeat matching zero or more
 
         => { # code block to replace.
 
             let temp_vec = vec::new();
 
-            # for each $(),replace code to the following statement.
+            # for each "$(),",replace code to the following statement.
             # $x is the expression in the matched rust code.
             # it is 0 1 2 3
             $(
@@ -4370,12 +4436,29 @@ custom derive still a derive attribute can only be used on structs and enums.
     // the "syn" crate parses rust code from a string into data structure that
     // we can perform operations on.
     // the "quote" crate turns "syn" data structures back into rust code.
-    
-    # for @derive_macro_name,if we defining a macro to implement a trait for
-    # a certain type,the name should follow the style "<trait-name>_derive".
-    # the detail of that trait should be defined in the crate "<trait-name>".
-    # (convention)
+    !! proc-macro crate type cant export any other items other than functions
+       tagged #[proc_macro], #[proc_macro_derive], #[proc_macro_attribute].
+       hence we can not place the "pub trait" declration in the same crate.
+       such functions must reside in the root of the crate -- lib.rs.
 
+    // about naming,for a crate named "foo",a custom derive procedural macro
+    // crate is called "foo_derive" -- project name.
+    //     [foo]
+    //         |-- Cargo.toml
+    //         |   \
+    //         |    [dependencies]
+    //         |    foo_derive = { path = "../foo_derive" }
+    //         |-- src
+    //               |-- main.rs      
+    //               |-- foo_struct.rs # structure definition
+    //
+    //     [foo_derive]
+    //                |-- src
+    //                      |-- lib.rs # contains derive macro definition
+    //
+    // @procedural_macro_fn naming should follows the style
+    //     <macro_name>_derive
+    
     fn impl_<macro_name>(ast: &syn::DeriveInput) -> TokenStream {
         let idt = &ast.ident;
         let output = quote! {
@@ -4385,6 +4468,10 @@ custom derive still a derive attribute can only be used on structs and enums.
                 }
             }
         };
+        // quote! return type proc2_macro::TokenStream,
+        // the into() method can be used to convert the type to
+        // proc_macro::TokenStream
+        output.into()
     }
     // '#' will turns the content in variable @idt to literal,like
     // the '#' in C and C++ macro.
@@ -4394,6 +4481,16 @@ custom derive still a derive attribute can only be used on structs and enums.
     // and converts it into a string literal at compile time,we can refer @idt
     // and convert it into string literal.
     //     stringify!(#idt) => "#idt"
+
+    !! WE MUST PROVIDE THE TRAIT DECLARATION BECAUSE THE DERIVE MACRO DO NOT
+       GENERATE TRAIT DECLRATION FOR US AUTOMATICALLY.
+       WE CAN PLACE THE DECLARATION IN A SEPARATE FILE AND "mod","use" IT
+       TO BRING THE TRAIT TO CURRENT SCOPE,ALSO PROVIDE THE DECLRATION IN
+       CURRENT SCOPE.
+
+    trait <trait-name> {
+        ...
+    }
 
     #[derive(<derive_macro_name>)]
     struct MyStruct { }
