@@ -4879,14 +4879,33 @@ are RefCell<>,Option<>,and Box<>.
         list: NodeConnectorType<T>,
     }   
 
-    /* RefCell<> provides interior mutability for us,this will be helpful
-     * when we need to add new node into the list,or remove one.
+    /* RefCell<> provides interior mutability,but for a single-linked
+     * list,it is useless.when we want to build doubly-linked list,
+     * we need to combine Rc<> and RefCell<>,to let @prev and @next
+     * are able to share ownership of the same list node.
+     * (usually,a new node of doubly-linked list,@prev and @next is
+     *  point to itself)
+     * # no RefCell<>
+     *       type NodeConnector<T> = Option<Box<ListNode<T>>>;
+     *       // then we no longer need RefCell::borrow() method is get
+     *       // called.
+     * # doubly-linked list combine Rc<> and RefCell<>
+     *       type PrevNodeConnector<T> = Option<Weak<RefCell<ListNode<T>>>>;
+     *       type NextNodeConnector<T> = Option<Rc<RefCell<ListNode<T>>>>;
+     *
      * Option<> provides move out from structure,then we can works on a
      * reference to Node to change the list without need to transfer
      * the ownership of that node.
      * Box<> provides heap allocation,can defer the construction to
      * runtime,and automatically construct object for us.
-     */
+     *
+     * The keys to build list in rust are
+     *     > connector supports take() and ?Sized for single-linked list.
+     *     > connector supports take(),share ownership,interior mutability
+     *       and ?Sized for doubly-linked list.
+     *       ! for prevent from volatile borrow rules at runtime,use
+     *         immutable references with interior mutability is better.
+     */ 
 
     fn list_add(&mut self, new_value: T) {
         let new_node = ListNode {
