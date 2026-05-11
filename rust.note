@@ -2746,20 +2746,32 @@ interior mutability is a design pattern in rust to allows us to modify an object
 through immutable reference.
 normally,the borrow rule forbit this pattern,but we can enforce modification
 through the "unsafe" pattern.
-"unsafe" means user checks borrow rules manually,do not rely on compiler to check
-them.
+! "unsafe" means user checks borrow rules manually,do not rely on compiler to check
+  them.
 
 rust type RefCell<T> are used to enforce borrow rules' invariants at runtime.
 It is defined in module std::cell as a type.
 RefCell<> can only be used in single-threaded scenario,and it can not share the
 ownership between several entities.but different from Rc<T>,RefCell<T> supports
 to immutable or mutable borrow checked at runtime,where Rc<T> is checked at 
-compile time.because this ability,we can mutate the object inside the RefCell<>
-even when the RefCell<> is immutable at runtime.
+compile time.
+because of this ability,we can mutate the object inside the RefCell<> even when
+the RefCell<> is immutable at runtime,or we initialize the RefCell<> with an
+immutable object in a move semantics that we can still modify the object at
+runtime through this immutable RefCell<> object.
 
 member method borrow_mut() of RefCell<> can be used to makeup a mutable reference
 to that object the RefCell<> is pointing.
 ! return RefMut<_, T> type,has DerefMut trait.
+
+member method into_inner() of RefCell<> can be used to consume this RefCell<> to
+get the wrapped object.
+! return T,transfer ownership of the inner,@self becomes invalid.
+
+member method clone() of RefCell<> can be used to clone the RefCell<> object,
+the method will does deep clone,that is it will makeup a copy of the inner and
+use the new RefCell<> object to wraps it.
+! return RefCell<T> object,transfer the copied object's ownership.
 
 member method borrow() of RefCell<> can be used to makeup an immutable reference
 to that object the RefCell<> is pointing.
@@ -4819,5 +4831,112 @@ usually CRLF is "\r\n",but it is rarely to be printed.
       <header> <crlf>
       <crlf>
       <body>
-    
 
+Linked List
+-----------
+
+usually,the rust collection Vec is suit for the scenario that linked list is
+needed.
+we can push element into Vec at runtime,similar to the linked list.
+but there is some methods to construct linked list like the C and C++
+linked list.
+
+use rust enumeration and Box can build a list like the cons-list in Lisp.
+    enum ConsList<T> {
+        item(T, Box<ConsList<T>>),
+        nil,
+    }   
+    /* if we do not wrap the next node into Box,rustc will tells us it
+     * can not know the size of ConsList<> object.
+     * Box<> allows us to get the object placed on heap,thus the inner
+     * will be constructed at runtime,and the size of Box<> object been
+     * known by rustc.
+     * This form requires we initialize the whole list at compile time,
+     * if we want grow the list or shrink it,we need Option<>.
+     * Because we need to re-construct @self for insertion,we also need
+     * to wrap the first object in @item into Option<>,then we can invoke
+     * take() method to move the object out from @self for re-construction.
+     *     item(Option<T>, Option<Box<ConsList<T>>>),
+     */
+
+use rust structure can build a list very like the C linked list,the requirements
+are RefCell<>,Option<>,and Box<>.
+    /* type alias */
+    type NodeConnectorType<T> = RefCell<Option<Box<T>>>;
+
+    /* for the last node in the list,its @next can be RefCell(None),then
+     * we can know where to stop the list traverse.
+     */
+    struct ListNode<T> {
+        item: T,
+        next: NodeConnectorType<T>,
+    }   
+
+    /* ListHead structure can helps us to separate list node and list head,
+     * if a list is empty,@list member should be RefCell(None).
+     */
+    struct ListHead<T> {
+        list: NodeConnectorType<T>,
+    }   
+
+    /* RefCell<> provides interior mutability for us,this will be helpful
+     * when we need to add new node into the list,or remove one.
+     * Option<> provides move out from structure,then we can works on a
+     * reference to Node to change the list without need to transfer
+     * the ownership of that node.
+     * Box<> provides heap allocation,can defer the construction to
+     * runtime,and automatically construct object for us.
+     */
+
+    fn list_add(&mut self, new_value: T) {
+        let new_node = ListNode {
+            item: new_value,
+
+            /*
+             * RefCell<> is a kind of SmartPointer,thus we invoke method
+             * take() on it is equivalent to invoke this method on the
+             * Option<> object.hence,we can move the inner of @next
+             * of @self out from the @self,it is needed for construct
+             * new Node.
+             */
+            next: RefCell::new(self.next.take()),
+        };
+
+        /*
+         * we spliced the new Node the rest,then we reset the first Node
+         * of this list head.
+         */
+        self.next = RefCell::new(Some(Box::new(new_node)));
+    }
+
+    /* because we pass the @item to println!(),the type T of @item must
+     * implements std::fmt::Display trait.
+     */
+    /* for list head to start print */
+    fn print_list<T: std::fmt::Display>(head: &ListHead<T>) {
+        match *head.borrow() {
+            /* typeof(@v) is &Box<ListNode<T> */
+            Some(ref v) => print_nodes(v),
+            None => return,
+        }
+    }   
+
+    /* recursively print the list items */
+    fn print_nodes<T: std::fmt::Display>(node: &Box<ListNode<T>>) {
+        println!("item : {}", node.item);
+        match node.next.borrow().as_ref() {
+            /* typeof(@v) is &Box<ListNode<T>> */
+            Some(v) => print_nodes(v),
+            None => return,
+        }
+    }
+
+if we want to define the list node recursively in order to represent the
+list head use the same list node structure,we can just use make a type
+alias for the Node type.
+    type ListHead<T> = ListNode<T>;
+in this case,the first ListNode<T> object should acts like a dummy head.
+if we want to distinguish the dummy head and real node,we can use the
+Option<> to wrap the @item member,for a dummy head,its @item should be
+None.but this requires the generic type T is sized that compiler can
+knows its size in compile time.
