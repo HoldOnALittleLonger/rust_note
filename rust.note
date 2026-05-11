@@ -2750,6 +2750,7 @@ through the "unsafe" pattern.
 them.
 
 rust type RefCell<T> are used to enforce borrow rules' invariants at runtime.
+It is defined in module std::cell as a type.
 RefCell<> can only be used in single-threaded scenario,and it can not share the
 ownership between several entities.but different from Rc<T>,RefCell<T> supports
 to immutable or mutable borrow checked at runtime,where Rc<T> is checked at 
@@ -2763,6 +2764,36 @@ to that object the RefCell<> is pointing.
 member method borrow() of RefCell<> can be used to makeup an immutable reference
 to that object the RefCell<> is pointing.
 ! return Ref<_, T> type,has Deref trait only.
+! usage:
+      let ref_str = RefCell::<String>::new(String::from("integer"));
+      let borrow_str = ref_str.borrow();    // Rec<_, String>
+      // @borrow_str acts like an immutable reference to the String object
+      // wrapped by the RefCell.
+
+      let mut ref_opt =
+          RefCell::<Option<String>>::new(Some(String::from("opt")));
+      // for the @ref_opt,if we borrow its wrapped object as immutable reference,
+      // the type of "ref_opt.borrow()" is Ref<_, Option<String>>.
+      // if we derefer the Ref<> type,the result type is Option<String>>.
+      // We can use the Ref<_, Option<String>> type as the &Option<String> type,
+      // because it implemented Derefer trait.
+
+      match ref_opt.borrow() {
+          Some(v) => {
+              // @v is the string and will be moved.
+              // but keyword "ref" for @v and as_ref() method of Option<>
+              // can help us refer to that object rather than move.
+              // "ref" case =>
+              //     we must derefer the borrowed reference at first.
+              //         match *ret_opt.borrow() { ... }
+              // as_ref() method case =>
+              //     we do not need to derefer the borrowed reference,as
+              //     instead,we invoke member method on it.
+              //         match ret_opt.borrow().as_ref() { ... }
+              ...
+          },
+          None => println!("none"),
+      }
 
 we can let Rc<T> object to holds a RefCell<T> object,and in which the real object
 is stored.then we can share ownership via the Rc<>,and we can use the immutable
