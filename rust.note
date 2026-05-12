@@ -2821,12 +2821,28 @@ Rc<> to modify the real object at runtime.
 !! reference cycle can leak memory.
    in C++,when use std::shared_ptr<>,reference cycle may occurs,
    but std::weak_ptr<> can prevent this.
+
    in rust
        enum ConsList {
            Cons(i32, RefCell<Rc<ConsList>>),
            Nil,
        } // bring reference cycle problem.
-   and there also has type Weak<T>,can be used to prevent this problem.
+
+       let mut a = Rc::new(Cons(0, RefCell::new(Rc::new(ConsList::Nil))));
+       // strong count of @a is 1.
+
+       let mut b = Rc::new(Cons(1, RefCell::new(Rc::clone(&a))));
+       // strong count of @a is 2.
+       // strong count of @b is 1.
+
+       // modify @a.cdr to the Rc<> cloned from @b.
+       // strong count of @b is 2.
+
+       // Drop @b, strong count of @b is 1,because @a refers to it.
+       // Drop @a, strong count of @a is 1,because @b refers to it.
+       // memory leak.
+
+   there has a type Weak<T>,can be used to prevent this problem.
    the member method downgrade(&rc) of Rc<> can be used to makeup an object
    it type of weak<>,and the Rc<> object's weak count will be increased by 1.
    weak<> do not share ownership,if we want to use a weak<> object,we need to
@@ -4903,7 +4919,7 @@ are RefCell<>,Option<>,and Box<>.
      *     > connector supports take() and ?Sized for single-linked list.
      *     > connector supports take(),share ownership,interior mutability
      *       and ?Sized for doubly-linked list.
-     *       ! for prevent from volatile borrow rules at runtime,use
+     *       ! for prevent from violate borrow rules at runtime,use
      *         immutable references with interior mutability is better.
      */ 
 
@@ -4959,3 +4975,109 @@ if we want to distinguish the dummy head and real node,we can use the
 Option<> to wrap the @item member,for a dummy head,its @item should be
 None.but this requires the generic type T is sized that compiler can
 knows its size in compile time.
+
+we can implement doubly-linked ring list in rust,but this is a dirty
+work,even so,such structure is available.
+    /* node connector type */
+    type PrevNodeConnector<_Tp> = Option<Weak<RefCell<Node<_Tp>>>>;
+    type NextNodeConnector<_Tp> = Option<Rc<RefCell<Node<_Tp>>>>;
+
+    /*
+     * Node<> - the list node structure
+     * @item:   item
+     * @is_head:
+     *          set to true if current node is head node
+     * @prev:   a wrapped Weak<> object to previous node
+     * @next:   a wrapped Rc<> object to next node
+     * @tail_node_next:
+     *          a wrapped Weak<> object to head node
+     * # we need @tail_node_next,because we must reduce the
+     *   reference count of head node to prevent memory leak.
+     */
+    struct Node<_Tp> {
+        item: _Tp,
+        is_head: bool,
+        prev: PrevNodeConnector<_Tp>,
+        next: NextNodeConnector<_Tp>,
+        tail_node_next: PrevNodeConnector<_Tp>,
+    }   
+    impl<_Tp> Node<_Tp> {
+        fn new(value: _Tp) -> Self {
+            Self {
+                item: value,
+                is_head: false,
+                prev: None,
+                next: None,
+                tail_node_next: None,
+            }
+        }
+    }   
+
+    /* dummy head */
+    struct DList<_Tp> {
+        head: NextNodeConnector<_Tp>,
+    }
+    impl<_Tp> DList<_Tp> {
+        fn new() -> Self {
+            head: None.
+        }
+
+        fn dlist_add(&mut self, value: _Tp) {
+            // first,create a new node through Node::new(@value).
+
+            // if @self is empty now,we let the new node become the
+            // first node in this dlist.
+            // ! empty => prev == next == None
+            //   because we can not let @prev = @next = current node
+            //   like the list in C and C++,we must change the initial
+            //   mark to None.
+
+            // if there has two elements now,including the new node,
+            // we link them together.
+            // suppose we always insert new node right after the
+            // head node,then we can ensure the second inserted node
+            // will be the tail node in the whole time,if we do not
+            // remove node.
+            //     head->next = new
+            //     new->prev = downgrade(head)
+            //     new->tail_node_next = downgrade(head)
+            //     head->prev = downgrade(new)        
+
+            // if there has more than two elements now,including the
+            // new node.
+            // we insert the new node right after head node,and adjust
+            // the rest.
+            //     head->next = new
+            //     head->next->prev = downgrade(new)
+            //     new->prev = downgrade(head)
+            //     new->next = head->next
+
+            // after all insertion,each Rc<> object's strong count must
+            // be 1.
+            // for head node,the outer variable holds the reference.
+            // for normal nodes,the reference is held by its previous
+            // node.
+            // hence,will no memory leak happens.(no reference cycle)
+        }
+
+        fn dlist_print_prev(&self) {
+            // similar to dlist_print(),but works on @prev,because
+            // @prev is weak reference,we must upgrade() it.
+            // clone will happens at there because we do not want
+            // to get ownership of @prev member,thus we must clone
+            // it,and upgrade() on the clone.
+        }
+
+        fn __dlist_print(reference to node) {
+            // similar to dlist_print(),but works on normal nodes.
+            // if current node's @is_head is true,stop traversing,
+            // return to caller.
+            // otherwise,print current node,and invoke __dlist_print()
+            // it self,pass it the @next of current node.
+        }
+
+        fn dlist_print(&self) {
+            // if head is not None,print head node.
+            // then invoke __dlist_print(),pass it the next of head.
+        }
+    }
