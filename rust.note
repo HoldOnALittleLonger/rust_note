@@ -5019,7 +5019,7 @@ work,even so,such structure is available.
     }
     impl<_Tp> DList<_Tp> {
         fn new() -> Self {
-            head: None.
+            head: None,
         }
 
         fn dlist_add(&mut self, value: _Tp) {
