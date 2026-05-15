@@ -62,7 +62,7 @@ it is always immutable.
     |     +--> object name
     +--> const keyword
 constant may be set only to a constant expression,that means its value must be
-determined during compile time,not at the runtime.
+determined during compile time,not at the runtime.(literal)
 the lifetime of constant is valid for the entire time a program runs,within the 
 scope in which it were declared.
 ! constant expression means,can not includes any variables.
@@ -4847,6 +4847,105 @@ usually CRLF is "\r\n",but it is rarely to be printed.
       <header> <crlf>
       <crlf>
       <body>
+
+Derivable Traits
+----------------
+
+Debug
+
+the Debug trait enables debug information,formatting in format strings,then
+we can print the debug info of an object them through "{:?}" placeholder.
+    #[derive(Debug)]
+    struct TheStruct {
+        a: i32,
+    }
+
+    let ts = TheStruct { a: 2, };
+    dbg!(ts);
+    println!("{:?}", ts);
+
+PartialEq and Eq for Equality Comparsions
+
+the derivable traits std::cmp::PartialEq and std::cmp::Eq allow us to compare
+equality of types derived these traits.
+we can compare the instances through operator== and operator!= .
+for struct,two instances are equal only if _all_ fields are equal.
+for enum,each variant is equal to itself and not equal to the other variants.
+PartialEq provides eq() method,when we compare instances,actually dealt with
+by this method.
+
+the std::cmp::Eq has no methods,it is used to signal that for "every value of
+the annotated type,the value is equal to itself".
+std::cmp::Eq requires std::cmp::PartialEq as base trait,but it is not all types
+can implement Eq trait.
+
+PartialOrd and Ord
+
+std::cmp::PartialOrd allows us to execute operator< operator> operator>= and
+operator<= on two instances.
+we can only apply PartialOrd on the type also applied PartialEq.
+PartialOrd provides partial_cmp() method,which returns type Option<Ordering>,
+when the values given do not produce an ordering,None is the inner.
+    partial_cmp(2.0_f32, NaN_f32) => None
+for struct,each fields will be compared under a given order.
+for enum,variants declared earlier in the definition are considered less than
+the variants are declared later.
+
+the Ord trait used to indicates any two values of the annotated type,a valid
+ordering will exist.
+Ord provides cmp() method,it will returns Ordering type,because a valid ordering
+will always be possible.
+we can only apply Ord on the type also applied PartialOrd and Eq(Eq requires the
+PartialEq trait).
+
+Clone and Copy
+
+Clone trait allows we explicitly create a deep copy of a value,and the duplication
+process might involve running arbitraty code and copying heap data.
+Clone provides clone() method,when we need to clone the annotated type's instance,
+each parts(if has any) will be cloned by call clone() on them,thus each fields
+their types must implemented Clone trait.
+
+Copy trait allows us to duplicate a value by only copying bits stored on the 
+stack,no arbitrary code is necessary.
+this trait does not prevent user from overloading those methods and violating
+the assumption that no arbitrary code is being run,so assume that copying
+a value will be very fast.
+
+A type apply Copy trait must applied Clone trait,too.usually,we do not need to
+implement Copy for a type,and this trait often used for optimizations.
+
+Hash trait
+
+the Hash trait allows us to take an instance of a type of arbitrary size and map
+that instance to a value of fixed size using a hash function.
+Hash trait provides hash() method,the derived implementation of hash() combines
+the result of calling hash() on each of the parts of the type,thus these parts
+must applied Hash trait,too.
+
+Default
+
+the Default trait allows us to create a default value for a type.
+Default trait provides default() method,when an annotated type become default
+value,default() will be called on each parts of the type,so these parts also
+need to implement Default trait.
+if we implemented Default trait for a struct,then we can use it in struct update
+syntax.
+    struct TheStruct {
+        a: i32,
+        ...
+    }
+    impl Default for TheStruct {
+        fn default(&mut self) { ... }
+    }
+
+    let ts = TheStruct {
+        a: 2,
+        ..Default::default(), // the rest fields are set to default value.
+    };
+# Default trait is required when use unwrap_or_default() on Option<T>,if the
+  Option<T> is None,then the result of Default::default() on T in Option<T>
+  will be returned.
 
 Linked List
 -----------
