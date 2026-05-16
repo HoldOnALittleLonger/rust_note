@@ -4978,6 +4978,10 @@ use rust structure can build a list very like the C linked list,the requirements
 are RefCell<>,Option<>,and Box<>.
     /* type alias */
     type NodeConnectorType<T> = RefCell<Option<Box<T>>>;
+    /*
+     * Option<RefCell<Box<T>>> is more usual,the above is a little weird.
+     * but any way,Option<> is needed for move out inner.
+     */
 
     /* for the last node in the list,its @next can be RefCell(None),then
      * we can know where to stop the list traverse.

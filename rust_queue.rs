@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 
-type NodeConnectorType<_Tp> = Rc<RefCell<Box<QueueNode<_Tp>>>>;
+type NodeConnectorType<_Tp> = Rc<RefCell<QueueNode<_Tp>>>;
 
 struct QueueNode<_Tp> {
     item: _Tp,
@@ -28,7 +28,7 @@ impl<_Tp> Drop for QueueNode<_Tp> {
 }
 
 type QueueHeadType<_Tp> = NodeConnectorType<_Tp>;
-type QueueTailType<_Tp> = Weak<RefCell<Box<QueueNode<_Tp>>>>;
+type QueueTailType<_Tp> = Weak<RefCell<QueueNode<_Tp>>>;
 
 struct Queue<_Tp> {
     head: Option<QueueHeadType<_Tp>>,
@@ -44,7 +44,7 @@ impl<_Tp> Queue<_Tp> {
     }
 
     fn construct_connector(node: QueueNode<_Tp>) -> NodeConnectorType<_Tp> {
-        Rc::new(RefCell::new(Box::new(node)))
+        Rc::new(RefCell::new(node))
     }
 
     fn enqueue(&mut self, value: _Tp) {

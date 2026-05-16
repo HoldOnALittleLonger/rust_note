@@ -4,6 +4,18 @@
 /// The definition to Node descriptor is very ugly,because we have
 /// to prevent memory leak and have to distinguish head node and normal
 /// node to determine where to stop the print traversing.
+/// Unfortunately,the type std::rc::Weak<> is not implement PartialEq,
+/// thus we can not to traverse the list like the Kernel Style.
+///     next != head
+/// When we test operator== on RefCell<>,it requires all fields of
+/// its inner the types need to implement PartialEq.
+/// Maybe we can wrap the Weak<> type into anothe type,and implement
+/// PartialEq on the wrapper to achieve this indirectly,but that will
+/// improve the dirty works we have to do.
+/// Hence,just put a head indicator @is_head in node is more easly
+/// to implement.
+/// Or,implement operator== for Node<>,and do special handling on it,
+/// such upgrade() the Weak<> object inside it.
 
 use std::rc::{Rc, Weak};
 use std::cell::RefCell;
@@ -51,6 +63,12 @@ impl<_Tp> Drop for Node<_Tp> {
     }
 }
 
+macro_rules! prefetch_next_item {
+    ( $rc_clone:expr ) => {
+        &$rc_clone.borrow().item
+    }
+}
+
 /* DList<> - dummy head */
 struct DList<_Tp: std::fmt::Display> {
     head: NextNodeConnector<_Tp>,
@@ -65,6 +83,38 @@ impl<_Tp: std::fmt::Display> DList<_Tp> {
     fn new() -> Self {
         Self {
             head: None
+        }
+    }
+
+    /*
+     * prefetch routine can be used by FIND primitive,and which will can be
+     * used for DELETE primitive.
+     * The problem is,when we decompose and Option<>,if we do not return
+     * ownership,then a temporary object would be created and bound to the
+     * inner.
+     * We can not return a reference to that temporary object directly,
+     * because a function should not return a reference to a stack object.
+     * Thus,we need to copy the @item.
+     * Another way is,return Rc<> to the next node instead return @item.
+     * In this case,the logic of prefetch_next_item() needed to be moved into
+     * where prefetch is required,no longer encapsolated into a function.
+     * For simplify the works,we can use a macro prefetch_next_item!() macro
+     * to do this.No longer need Clone trait.
+     */
+    fn __prefetch_next(node: &Node<_Tp>) -> NextNodeConnector<_Tp> {
+        if let None = node.next {
+            None
+        } else {
+            let next_node_rc_clone = Rc::clone(node.next.as_ref().unwrap());
+            Some(next_node_rc_clone)
+        }
+    }
+
+    /* just for test */
+    fn retrieve_next_item(node: &Node<_Tp>) {
+        if let Some(rc_clone) = Self::__prefetch_next(node) {
+            // let _:() = prefetch_next_item!(rc_clone); => &_Tp
+            println!("item is {}", prefetch_next_item!(rc_clone));
         }
     }
 
@@ -207,7 +257,6 @@ impl<_Tp: std::fmt::Display> DList<_Tp> {
         }
     }
 
-
     fn dlist_print(&self) {
         match self.head.as_ref() {
             Some(v) => {
@@ -241,6 +290,7 @@ fn main() {
         println!("@dlist->head strong count is {}",
                  Rc::strong_count(v));
     }
+    println!("------------------------");
 
     dlist.dlist_add(1);
     dlist.dlist_add(2);
@@ -251,6 +301,9 @@ fn main() {
     dlist.dlist_add(7);
     dlist.dlist_add(8);
     dlist.dlist_add(9);
+
+    DList::<i32>::retrieve_next_item(&*dlist.head.as_ref().unwrap().borrow());
+    println!("------------------------");
 
     dlist.dlist_print();
     println!("------------------------");
